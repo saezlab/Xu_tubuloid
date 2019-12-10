@@ -1,0 +1,460 @@
+---
+title: "Single-cell analysis on CD13+ sorted cells"
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+date: "11/28/2019"
+license: "GPL-v3"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and auxiliar functions
+
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(GSEABase))
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(ComplexHeatmap))
+suppressPackageStartupMessages(require(clustree))
+suppressPackageStartupMessages(require(cowplot))
+source("./src/seurat_fx.R")
+```
+
+
+## Read data into a Seurat Object
+```{r data, cache=TRUE}
+SeuratObject <- getSeuratObject(path = "./data/sc/CK120_CD13/filtered_feature_bc_matrix/",
+                     project_name = "CK120_CD13", 
+                     mt.pattern = "^MT-", min.cells = 5, 
+                     min.features = 200)
+
+# Define output directory
+OUTDIR <- paste0("./output/",Project(SeuratObject))
+if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
+```
+
+## Quality control
+
+```{r QC,fig.width=14, fig.height=4}
+print(VlnPlot(SeuratObject, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3))
+
+print(CombinePlots(plots = list(FeatureScatter(SeuratObject, feature1 = "nCount_RNA", feature2 = "percent.mt"),
+                                FeatureScatter(SeuratObject, feature1 = "nCount_RNA", feature2 = "nFeature_RNA")))
+)
+
+```
+
+## Data cleasing: gene and cell filtering
+To avoid unnecessary sparsity and noise in downstream analysis,    
+* We discard cells with low (<200) and high (>6000) number of genes detected to 
+avoid bad quality and doublets, repectively.    
+* We discard genes not detected across cells.    
+For this we use cutoffs in concordance with kidney tissue, where Proximal tubule
+cells might have a high content of mitochondrial genes (<80%). Later we will
+apply diagnostics to see if this is related.
+
+```{r cars}
+nSamples_before <- ncol(SeuratObject)
+SeuratObject <- subset(SeuratObject, nFeature_RNA > 200 & nFeature_RNA < 6000 & percent.mt < 80)
+nSamples_after <- ncol(SeuratObject)
+```
+
+Doing so, `r nSamples_after` out of an initial `r nSamples_before` total were retrieve
+for the analysis, thus discarding a `r (nSamples_before - nSamples_after)` cells.
+
+## Pre-processing the data for cell clustering and cell-type assignment
+First, we normalize the data using default parameters
+```{r norm, cache=TRUE}
+SeuratObject <- NormalizeData(SeuratObject)
+```
+
+Second, we perform a feature selection based on `vst` method to select 
+high variable genes (top 2000) for cell clustering.
+```{r sel, cache=TRUE}
+SeuratObject <- FindVariableFeatures(SeuratObject, selection.method = "vst", nfeatures = 2000)
+
+print(LabelPoints(VariableFeaturePlot(SeuratObject),
+                  points=VariableFeatures(SeuratObject)[1:10],repel = TRUE))
+```
+
+Third, we center and scale the data prior PCA:
+
+```{r scale,cache=TRUE}
+SeuratObject <- Seurat_scaledata(SeuratObject)
+```
+
+Finally we perform PCA, selecting a number of PCs that are relevant based on the
+elbow plot. We tested that our results are not sensitive to this parameter, and
+the arbitrary selection of number of PCs do not change final conclusions.
+```{r pca, cache=TRUE}
+SeuratObject <- RunPCA(SeuratObject, features = VariableFeatures(SeuratObject), npcs = 50)
+print(ElbowPlot(SeuratObject,ndims = 50) + geom_vline(xintercept = 25, col="red"))
+```
+
+We decided to use 25 PCs for the clustering.
+
+## Cell clustering
+We are going to use Shared-Nearest Neighbour with Graph partitioning for cell clustering.
+We run the algorithm with multiple resolutions. Later this is read-out to give 
+an idea how these are consistent from a lower to high number of expected cell populations
+in the sample.   
+
+```{r clust, cache=TRUE}
+SeuratObject <- FindNeighbors(SeuratObject, dims = 1:25)
+SeuratObject <- FindClusters(SeuratObject, resolution = seq(from=0.1, to=1, by=0.1))
+
+# We redefine the final partitioning with resolution 0.5
+SeuratObject <- FindClusters(SeuratObject, resolution = 0.5)
+```
+
+We will investigate how the selection of multiple resolutions affects the partition
+into individual cell clusters.
+```{r clustree, fig.width=7, fig.height=10}
+clustree(SeuratObject, prefix = "RNA_snn_res.")
+```
+
+## Cell marker extraction
+We are going to use two methods for the extraction of cell markers.   
+1. Differential gene expression using wilcox test from Seurat. Only positive
+and consistent markers will be tested (with default parameters).   
+2. GenesorteR to get posterior probabilities for each gene of observing a certain
+cell population.
+
+### 1 wilcox test
+```{r wilcox, cache=TRUE}
+up <- setNames(vector("list",length=length(levels(SeuratObject))), 
+               levels(SeuratObject))
+for(idx in names(up)) {
+  up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
+                        ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
+  cols_names <- colnames(up.idx)
+  
+  # Add two extra cols
+  up.idx$cluster <- idx
+  up.idx$gene <- rownames(up.idx)
+  
+  up[[idx]] <- up.idx
+}
+```
+
+### 2 Gene sorter
+
+```{r genesort, cache=TRUE}
+### 2 genesorteR
+sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
+
+#define a small set of markers
+mm = getMarkers(sg, quant = 0.975)
+
+#cluster genes and make a heatmap
+pp = plotMarkerHeat(sg$inputMat, sg$inputClass, mm$markers, clusterGenes=TRUE, outs = TRUE)
+
+pp$gene_class_info #gene clusters
+
+#the top 25 genes for each cluster by specificity scores
+top_markers = apply(sg$specScore, 2, function(x) names(head(sort(x, decreasing = TRUE), n = 25)))
+
+```
+
+Finally we save the markers for manual exploration:
+
+```{r init_markers_save}
+MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers/Init")
+if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
+
+# Wilcox
+for(idx in names(up)) {
+  write.table(up[[idx]][,c("cluster", "gene", cols_names)],
+              file = paste0(MARKERS_OUTDIR,"/cluster",idx,".tsv"),
+              sep="\t",col.names = TRUE, row.names = FALSE, quote=FALSE
+  )
+}
+
+# Genesorter
+write.table(as.matrix(sg$specScore), paste0(MARKERS_OUTDIR,"/specScore.tsv"),
+            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+
+write.table(as.matrix(sg$condGeneProb), paste0(MARKERS_OUTDIR,"/condGeneProb.tsv"),
+            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+```
+
+## Non-linear dim reduction (umap)
+
+```{r umap, cache=TRUE}
+SeuratObject <- RunUMAP(SeuratObject, dims = 1:25)
+```
+
+```{r umap_plot, fig.width=4, fig.height=4}
+DimPlot(SeuratObject, reduction = "umap", label = TRUE, label.size = 8)
+```
+
+## Cell assignment
+We tooked a look at the markers from the different clusters from previous section.
+These can be found in the `output` directory.
+
+Looking into them, we could identify different cell lineages that are actually 
+contaminant and not expected in the CD24+ sorted cells:
+- Hematopoietic cells 
+- Endothelial cells
+
+Thus first we rename the cell cluster, and discard those afterwards.
+
+```{r rename_idents}
+ren_id <- setNames(c(rep("NA", length(levels(Idents(SeuratObject))))),
+            levels(Idents(SeuratObject)))
+```
+
+We identify *hematopoietic cells* using the cannonical marker of this lineage, that
+is the PTPRC gene expression. None clusters are highlighted.
+
+```{r PTPRC,fig.width=4, fig.height=4}
+FeaturePlot(SeuratObject, reduction = "umap", features = "PTPRC", label = TRUE)
+```
+
+Similarly, we identify potential *endothelial cells* using PECAM1. Highlighting that
+the cluster 6 are endothelial cells.
+```{r PECAM1,fig.width=4, fig.height=4}
+FeaturePlot(SeuratObject, reduction = "umap", features = "PECAM1", label = TRUE)
+
+ren_id[c("6")] <- paste0("Endothelial","_6")
+```
+
+Finally we highlight the expression of SLC5A2 and SLC22A6, which is a marker of Proximal
+tubule cells (S1 and S2, respectively)
+
+```{r PT,fig.width=10, fig.height=4}
+FeaturePlot(SeuratObject, reduction = "umap", features = c("SLC5A2","SLC22A6"), label = TRUE)
+
+ren_id[as.character(0:4)] <- paste0("PT_S1","_",as.character(0:4))
+ren_id["5"] <- paste0("PT_S2","_","5")
+```
+
+
+Finally, we took a look at the markers from previous section for a rational 
+assignment of clusters to cell types.
+
+| Cluster | rational |
+|:---:|:---:|
+| Cluster 0 | proximal tubule ( 20% SLC5a2, S1) |
+| Cluster 1 | proximal tubule ( 23% SLC5a2, S1) |
+| Cluster 2 | proximal tubule ( 21% SLC5a2, S1); STCs? VIM? |
+| Cluster 3 | proximal tubule ( 11% SLC5a2, S1) |
+| Cluster 4 | proximal tubule ( 13% SLC5a2, S1) |
+| Cluster 5 | proximal tubule  no SLC5a2, 37% SLC 22a6, S2? |
+| Cluster 6 | exclude endothelium |
+
+```{r cell_ann}
+SeuratObject <- RenameIdents(SeuratObject, ren_id)
+```
+
+We cross-check that everything was assigned as it is stated using a set of 
+context-specific markers
+```{r assign_check, fig.width=10, fig.height=12}
+context_genes <- getGmt("./data/Prior/Kramann_context.gmt")
+print(DotPlot(SeuratObject, features = unlist(geneIds(context_genes)), dot.scale = 14) + 
+        coord_flip() + scale_y_discrete(position = "right") +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+)
+```
+
+Finally we remove the contaminant cell populations from the gene sorting that 
+are not epithelial cells.
+
+```{r assign_filter}
+SeuratObject <- SeuratObject[, !grepl("^(Hematopoietic|Endothelial)", 
+                                      Idents(SeuratObject))]
+
+# Remove original reference to clustering
+SeuratObject <- RenameIdents(SeuratObject, 
+                             setNames(gsub("_[0-9]+","",Idents(SeuratObject)),
+                                      Idents(SeuratObject)))
+```
+
+```{r assign_dot, fig.width=7, fig.height=12}
+context_genes <- getGmt("./data/Prior/Kramann_context.gmt")
+print(DotPlot(SeuratObject, features = unlist(geneIds(context_genes)), dot.scale = 14) + 
+        coord_flip() + scale_y_discrete(position = "right") +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+)
+```
+
+## Re-clustering and high dim. reduction after filtering contaminant populations
+
+To trace back previous cell boundaries, we store the outcome
+```{r init_cl}
+SeuratObject$init_seurat_clusters <- SeuratObject$seurat_clusters
+SeuratObject$init_assign <- Idents(SeuratObject)
+
+```
+
+We proceed with the standard pipeline for cell clustering, over-written previous
+outcome
+
+```{r re_clust, cache=TRUE, fig.width=11, fig.height=4}
+## Feature selection
+SeuratObject <- FindVariableFeatures(SeuratObject, selection.method = "vst", nfeatures = 2000)
+
+## PCA 
+SeuratObject <- RunPCA(SeuratObject, features = VariableFeatures(SeuratObject), npcs = 50)
+print(ElbowPlot(SeuratObject,ndims = 50) + geom_vline(xintercept = 25, col="red"))
+
+## Cell clustering
+SeuratObject <- FindNeighbors(SeuratObject, dims = 1:25)
+SeuratObject <- FindClusters(SeuratObject, resolution = 0.5)
+
+## Agreement with previous clustering
+table("initial"=SeuratObject$init_seurat_clusters,
+      "final"=SeuratObject$seurat_clusters)
+
+table("Assigned"=SeuratObject$init_assign,
+      "final"=SeuratObject$seurat_clusters)
+
+
+## UMAP
+SeuratObject <- RunUMAP(SeuratObject, dims = 1:25)
+d1 <- DimPlot(SeuratObject, group.by = "init_assign") + ggtitle("Initial Cell assignment")
+d2 <- DimPlot(SeuratObject) + ggtitle("Re-classification")
+
+print(CombinePlots(list(d1,d2)))
+
+```
+
+In conclusion, the new clustering outcome lead to the same as before, but one
+cluster was split into two. We rename them accordingly.
+
+## Getting markers for the final clusters
+
+### 1 wilcox test
+```{r final_wilcox, cache=TRUE}
+up <- setNames(vector("list",length=length(levels(SeuratObject))), 
+               levels(SeuratObject))
+for(idx in names(up)) {
+  up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
+                        ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
+  cols_names <- colnames(up.idx)
+  
+  # Add two extra cols
+  up.idx$cluster <- idx
+  up.idx$gene <- rownames(up.idx)
+  
+  up[[idx]] <- up.idx
+}
+```
+
+### 2 Gene sorter
+
+```{r finalgenesort, cache=TRUE}
+### 2 genesorteR
+sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
+
+```
+
+Save them in tables so we could make a second round of manual exploration on them
+for the final assignment.
+
+```{r final_markers_save}
+MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers/Final")
+if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
+
+# Wilcox
+for(idx in names(up)) {
+  write.table(up[[idx]][,c("cluster", "gene", cols_names)],
+              file = paste0(MARKERS_OUTDIR,"/cluster",idx,".tsv"),
+              sep="\t",col.names = TRUE, row.names = FALSE, quote=FALSE
+  )
+}
+
+# Genesorter
+write.table(as.matrix(sg$specScore), paste0(MARKERS_OUTDIR,"/specScore.tsv"),
+            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+
+write.table(as.matrix(sg$condGeneProb), paste0(MARKERS_OUTDIR,"/condGeneProb.tsv"),
+            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+```
+
+
+## Final cell assignment
+We checked markers for different PTs in the kidney nephron:
+```{r adhoc_dotplot}
+DotPlot(SeuratObject, features=c("SLC5A2","SLC22A6","AGT"))
+```
+
+Finally we decided the cell type for each cluster - all of them PT, but from different
+parts from the nephron based on the dotplot above:
+
+| Cluster | rational |
+|:---|:---|
+| Cluster 0 | PT_S2_1 |
+| Cluster 1 | PT_S2_2 |
+| Cluster 2 | PT_S2_3 |
+| Cluster 3 | PT_S1_1 |
+| Cluster 4 | PT_S1_2  |
+| Cluster 5 | PT_S3 |
+
+```{r cell_assign2}
+ren_id <- c("0"="PT_S2_1",
+            "1"="PT_S2_2",
+            "2"="PT_S2_3",
+            "3"="PT_S1_1",
+            "4"="PT_S1_2",
+            "5"="PT_S3")
+SeuratObject <- RenameIdents(SeuratObject, ren_id)
+```
+
+
+
+## Figures for publishing
+
+> We take in advantage the Knit capability of generating PDF/PNG files in output
+folders to save those figures that are going to be included as main or supplementary
+in the final manuscript.
+
+```{r, mkdir_figs}
+FIGS_OUTDIR <- paste0(OUTDIR,"/figs")
+if(! dir.exists(FIGS_OUTDIR)) dir.create(FIGS_OUTDIR, recursive = TRUE)
+```
+
+```{r CK120_CD13_umap_final, fig.path='./output/CK120_CD13/figs/', dev = c('png','pdf')}
+DimPlot(SeuratObject, reduction="umap")
+SeuratObject$cell_pop <- gsub("_[0-9]+$","",Idents(SeuratObject))
+DimPlot(SeuratObject, reduction="umap", group.by = "cell_pop")
+```
+
+```{r CK120_CD13_context_dotplot_final, fig.width=7, fig.height=12, fig.path='./output/CK120_CD13/figs/', dev = c('png','pdf')} 
+context_genes <- getGmt("./data/Prior/Kramann_context.gmt")
+print(DotPlot(SeuratObject, features = unlist(geneIds(context_genes)), dot.scale = 14) + 
+        coord_flip() + scale_y_discrete(position = "right") +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+)
+```
+
+```{r CK120_CD13_wilcox_heatmap_final, fig.width=9, fig.height=7, fig.path='./output/CK120_CD13/figs/', dev = c('png','pdf')}
+wilcox_GS <- GeneSetCollection(sapply(names(up), function(z) GeneSet(up[[z]][1:10, "gene"],setName=ren_id[z]), simplify = FALSE))
+
+DoHeatmap2(SeuratObject, GSC = wilcox_GS, assay = "RNA", res = 0.5, show_hr = FALSE)
+```
+
+```{r CK120_CD13_specScore_heatmap_final, fig.width=9, fig.height=7, fig.path='./output/CK120_CD13/figs/', dev = c('png','pdf')}
+specScore_GS <- GeneSetCollection(sapply(colnames(sg$specScore),function(idx) {
+                              GeneSet(names(head(sort(sg$specScore[,idx], decreasing = TRUE), n = 10)),
+                                      setName=ren_id[idx], shortDescription="genesorteR")
+  }))
+
+DoHeatmap2(SeuratObject, GSC = specScore_GS, assay = "RNA", res = 0.5, show_hr = FALSE)
+```
+## Session info                                                                                                                                                                                             
+                                                                                                                                                                                                            
+```{r}                                                                                                                                                                                                      
+sessionInfo()
+{                                                                                                                                                                                                           
+sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
+print(sessionInfo())
+sink()
+}
+
+```
