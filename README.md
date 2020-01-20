@@ -26,13 +26,12 @@ PECAM1 gene expression was used to identify contaminant hematopoietic and endoth
 Similarly, the remaining unrelated cell clusters to the biological context under study with high content of ribosomal and mitochondrial 
 genes were also discarded. Proliferating cell clusters were identified by scoring the average expression of cell cycle genes [3], as 
 compared to a control set as proposed in the CellCycleScoring function from Seurat with default parameters. UMAP was used to reduce 
-the 25 principal components into 2-dimensional space, showing the cell cluster labels from the cell assignment. Raw sequencing data 
-and processed matrices from scRNA-seq were deposited in the Gene Expression Omnibus database with the accession number _GEOXXXXX_.
+the 25 principal components into 2-dimensional space, showing the cell cluster labels from the cell assignment.
 
-*References*:
-1. Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM, Hao Y, Stoeckius M, Smibert P, Satija R. Comprehensive Integration of Single-Cell Data. Cell. 2019 Jun 13;177(7):1888-1902.e21
-2. MM Ibrahim and  Kramann R. genesorteR: Feature Ranking in Clustered Single Cell Data. bioRxiv
-3. Tirosh I, Izar B, Prakadan SM, Wadsworth MH, Treacy D, Trombetta JJ, Rotem A, Rodman C, Lian C, Murphy G, Fallahi-Sichani M, Dutton-Regester K, Lin JR, Cohen O, Shah P, Lu D, Genshaft AS, Hughes TK, Ziegler CG, Kazer SW, Gaillard A, Kolb KE, Villani AC, Johannessen CM, Andreev AY, Van Allen EM, Bertagnolli M, Sorger PK, Sullivan RJ, Flaherty KT, Frederick DT, Jané-Valbuena J, Yoon CH, Rozenblatt-Rosen O, Shalek AK, Regev A, Garraway LA. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science. 2016 Apr 8;352(6282):189-96
+> *References*:
+> 1. Stuart T, Butler A, Hoffman P, Hafemeister C, Papalexi E, Mauck WM, Hao Y, Stoeckius M, Smibert P, Satija R. Comprehensive Integration of Single-Cell Data. Cell. 2019 Jun 13;177(7):1888-1902.e21
+> 2. MM Ibrahim and  Kramann R. genesorteR: Feature Ranking in Clustered Single Cell Data. bioRxiv
+> 3. Tirosh I, Izar B, Prakadan SM, Wadsworth MH, Treacy D, Trombetta JJ, Rotem A, Rodman C, Lian C, Murphy G, Fallahi-Sichani M, Dutton-Regester K, Lin JR, Cohen O, Shah P, Lu D, Genshaft AS, Hughes TK, Ziegler CG, Kazer SW, Gaillard A, Kolb KE, Villani AC, Johannessen CM, Andreev AY, Van Allen EM, Bertagnolli M, Sorger PK, Sullivan RJ, Flaherty KT, Frederick DT, Jané-Valbuena J, Yoon CH, Rozenblatt-Rosen O, Shalek AK, Regev A, Garraway LA. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science. 2016 Apr 8;352(6282):189-96
 
 ## Usage
 You can reproduce the results following these instructions:
@@ -47,6 +46,7 @@ bash run_rmd.sh
 ## Environment
 
 **Required packages**
+
 | Package name | source | version |
 | :--- | :---: | ---: |
 | Seurat | https://satijalab.org/seurat/install.html | 3.1.0 |
