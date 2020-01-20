@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r libs}
 set.seed(1234)
 suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(ggplot2))
 suppressPackageStartupMessages(require(GSEABase))
 suppressPackageStartupMessages(require(dplyr))
 suppressPackageStartupMessages(require(genesorteR))
@@ -395,9 +396,22 @@ ren_id <- c("0"="PT-like_1",
             "6"="Prolif_PT-like_2",
             "7"="Prolif_PT-like_3",
             "8"="Epithelial_(Unk)",
-            "9"="PEC-like_6")
+            "9"="PEC-like")
 SeuratObject <- RenameIdents(SeuratObject, ren_id)
 
+```
+
+## Data tables
+```{r, mkdir_tab}
+TAB_DIR <- paste0(OUTDIR,"/tabs")
+if(!dir.exists(TAB_DIR)) dir.create(TAB_DIR)
+```
+
+How many cell types per cluster
+```{r No_cells}
+write.table(as.matrix(table(Idents(SeuratObject))), sep="\t",
+                      file=paste0(TAB_DIR,"/celltype_counts.tsv"),
+            row.names = TRUE, col.names = FALSE, quote=FALSE)
 ```
 
 ## Figures for publishing
@@ -412,23 +426,32 @@ if(! dir.exists(FIGS_OUTDIR)) dir.create(FIGS_OUTDIR, recursive = TRUE)
 ```
 
 ```{r CK119_organoid_umap_final, fig.path='./output/CK119_organoid/figs/', dev = c('png','pdf')}
-DimPlot(SeuratObject, reduction="umap")
-SeuratObject$cell_pop <- gsub("_[0-9]+$","",Idents(SeuratObject))
-DimPlot(SeuratObject, reduction="umap", group.by = "cell_pop")
+# ggplot2 colors given a set of n groups
+gg_color_hue <- function(n) {
+    hues = seq(15, 375, length = n + 1)
+    hcl(h = hues, l = 65, c = 100)[1:n]
+}
+
+# define those colors but 'unknown' cells as grey
+cols_but_unk <- function(lvls) {
+  gg_cols <- setNames(gg_color_hue(length(lvls)), lvls)
+  gg_cols[grepl("Unk",names(gg_cols))] <- "grey60"
+  return(gg_cols)
+}
+
+# umap
+umap_cols <- cols_but_unk(levels(SeuratObject@active.ident))
+DimPlot(SeuratObject, reduction="umap", cols = umap_cols)
+
+SeuratObject$cell_pop <- factor(gsub("_[0-9]+$","",Idents(SeuratObject)))
+umap_cols <- cols_but_unk(levels(SeuratObject$cell_pop))
+DimPlot(SeuratObject, reduction="umap", group.by = "cell_pop", cols = umap_cols)
 ```
 
 ```{r CK119_organoid_adhoc_dotplot_final, fig.path='./output/CK119_organoid/figs/', dev = c('png','pdf')}
 DotPlot(SeuratObject, features = c("SLC12A1", "SLC12A3", "KLK6", "CLDN1", "SLC4A1", "AKAP12", "VCAM1", "SLC34A1"), dot.scale = 14) + 
         coord_flip() + scale_y_discrete(position = "right") +
         theme(axis.text.x = element_text(angle = 45, hjust = 0))
-```
-
-```{r CK119_organoid_context_dotplot_final, fig.width=7, fig.height=12, fig.path='./output/CK119_organoid/figs/', dev = c('png','pdf')} 
-context_genes <- getGmt("./data/Prior/Kramann_context.gmt")
-print(DotPlot(SeuratObject, features = unlist(geneIds(context_genes)), dot.scale = 14) + 
-        coord_flip() + scale_y_discrete(position = "right") +
-        theme(axis.text.x = element_text(angle = 45, hjust = 0))
-)
 ```
 
 ```{r CK119_organoid_wilcox_heatmap_final, fig.width=9, fig.height=9, fig.path='./output/CK119_organoid/figs/', dev = c('png','pdf')}
@@ -445,14 +468,25 @@ specScore_GS <- GeneSetCollection(sapply(colnames(sg$specScore),function(idx) {
 
 DoHeatmap2(SeuratObject, GSC = specScore_GS, assay = "RNA", res = 0.5, show_hr = FALSE)
 ```
-## Session info                                                                                                                                                                                             
-                                                                                                                                                                                                            
-```{r}                                                                                                                                                                                                      
+
+## Save the Seurat Object for downstream analysis
+
+```{r, mkdir_data}
+DATA_DIR <- paste0(OUTDIR,"/data")
+if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
+```
+
+```{r save_S}
+saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+```                                                                                                                                                                                                         
+
+## Session info
+
+```{r}
 sessionInfo()
 {                                                                                                                                                                                                           
 sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
 print(sessionInfo())
 sink()
 }
-
 ```
