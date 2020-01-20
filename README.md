@@ -1,4 +1,4 @@
-# Bioinformatics analysis on Tubuloid samples of single-cell RNA-seq
+# Bioinformatics single-cell RNA-seq analysis on Tubuloid-derived samples
 The following samples were profiled at the single-cell resolution:
 * CK5 early organoid. Organoid generated from CD24+ sorted cells from human adult kidney tissue at an early stage.
 * CK119 late organoid. Organoid generated from CD24+ sorted cells from human adult kidney tissue at a late stage.
