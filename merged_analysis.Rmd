@@ -1,0 +1,356 @@
+---
+title: "merge_individuals"
+author: "Javier Perales-Paton"
+date: "12/23/2019"
+output: html_document
+---
+
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(GSEABase))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(cowplot))
+source("./src/seurat_fx.R")
+```
+
+## Prepare environment
+Define the output directory for figures and tables
+
+```{r outdir}
+OUTDIR <- "./output/merged"
+FIGSDIR <- paste(OUTDIR,"/figs")
+TABSDIR <- paste(OUTDIR,"/tabs")
+```
+
+## Combine samples
+Load and merge the individual samples from the project
+
+```{r load_SeuratObjects}
+list_rds <- list.files("./output/", recursive = TRUE, pattern = "SeuratObject.rds")
+names(list_rds) <- dirname(dirname(list_rds))
+
+# Load individual SeuratObjects
+for(sname in names(list_rds)) {
+  cat(paste0("Loading ",sname, "'s SeuratObject","\n"), file=stdout())
+  SObj <- readRDS(paste0("./output/",list_rds[[sname]]))
+  # Scale data
+  SObj <- ScaleData(SObj, verbose = FALSE)
+  
+  SObj$proj_ident <- paste0("[",Project(SObj),"] ",Idents(SObj))
+  SObj$ident_proj <- paste0(Idents(SObj), " [",Project(SObj),"]")
+  # Rename idents incl
+  assign(sname, SObj)
+  rm(SObj)
+}
+
+(snames <- names(list_rds))
+```
+
+## individual UMAPs per sample
+```{r colors}
+# ggplot2 colors given a set of n groups
+gg_color_hues <- function(split_classes) {
+  n <- length(split_classes)
+    hues = setNames(seq(15, 375, length = n + 1),
+                    names(split_classes))
+    
+    cols <- sapply(names(split_classes), function(cl) {
+                      subcl <- split_classes[[cl]]
+                      cols <- hcl(h=hues[cl],
+                            l=seq(60,95, length=length(subcl)),
+                            c=100)
+                      return(cols)
+    }, simplify = FALSE)
+    return(cols)
+}
+
+# All classes in all 4 samples
+classes_level2 <- sort(unique(unlist(sapply(snames, function(sname) levels(Idents(get(sname)))))))
+# Many times, same class between samples are named with an optional _1
+classes_level2 <- unique(gsub("_1$","",classes_level2))
+# Count how many of the same type
+classes_level1 <- gsub("_(S[0-9](_[0-9])?|[0-9]+)$","",classes_level2)
+  # classes_level1 <- gsub("Prolif_", "", classes_level1)
+split_classes <- split(classes_level2, classes_level1)
+unk <- split_classes[grepl("unk", names(split_classes), ignore.case = TRUE)]
+cols_unk <- sapply(names(unk), function(z) "grey")
+
+split_classes <- split_classes[!grepl("unk", names(split_classes), ignore.case = TRUE)]
+
+  # Minor manual change: add prolif_PT-like[/STC] to their corresponding upper groups.
+
+  # Why Manually? Actually this hue palette was obtained by chance
+  # for this many number of classes. Later we observed that we shoud group proliferating
+  # with their upper clases, but the original hue palettewas great to represent the biology: 
+  #         PT=blue, PT-like(STC)=pink, STC=pink
+  # So we decided to merge them manually and create dummy classes to keep the 
+  # original number of classes for color palette generation, so those dummies are only preserved
+  # for that and later ignored
+
+  # How to integrate alternative indexes from two vectors,
+  # source: https://stackoverflow.com/questions/25961897/how-to-merge-2-vectors-alternating-indexes
+  a1 <- c(split_classes$`PT-like/STC`)
+  a2 <- c(split_classes$`PT-like`,
+          split_classes$`Prolif_PT-like`,
+          split_classes$`Prolif_PT-like/STC`)
+  split_classes$`PT-like/STC` <- c(a1, a2)[order(c(seq_along(a1)*2 - 1, seq_along(a2)*2))]
+  split_classes$`PT-like` <- "DUMMY1"
+
+  # We keep the original number of classes to match across samples, creating a dummy class
+  # This dummy color never shows up in any plot
+  prolif_idx <- grep("Prolif_PT-like", names(split_classes))
+  names(split_classes)[prolif_idx] <- paste0("DUMMY", prolif_idx)
+  split_classes[grep("DUMMY", names(split_classes))] <- paste0("DUMMY",prolif_idx)
+
+cols <- gg_color_hues(split_classes)
+cols <- c(cols,cols_unk)
+split_classes <- c(split_classes, unk)
+
+cols <- setNames(unlist(cols), unlist(split_classes))
+cols <- cols[sort(names(cols))]
+cols <- c(cols,setNames(cols, paste0(names(cols),"_1")))
+# Remove dummies
+cols <- cols[!grepl("DUMMY", names(cols))]
+
+# Save them
+saveRDS(cols, file="./output/color_scheme.rds")
+```
+
+```{r CK5_organoid_umap_final, fig.path='./output/CK5_organoid/figs/', dev = c('png','pdf')}
+umap_cols <- cols[levels(get("CK5_organoid")@active.ident)]
+DimPlot(get("CK5_organoid"), reduction="umap", cols = umap_cols[], label=FALSE)
+```
+
+```{r CK119_organoid_umap_final, fig.path='./output/CK119_organoid/figs/', dev = c('png','pdf')}
+umap_cols <- cols[levels(get("CK119_organoid")@active.ident)]
+DimPlot(get("CK119_organoid"), reduction="umap", cols = umap_cols[], label = FALSE)
+```
+
+```{r CK120_CD13_umap_final, fig.path='./output/CK120_CD13/figs/', dev = c('png','pdf')}
+umap_cols <- cols[levels(get("CK120_CD13")@active.ident)]
+DimPlot(get("CK120_CD13"), reduction="umap", cols = umap_cols[], label=FALSE)
+```
+
+```{r CK121_CD24_umap_final, fig.path='./output/CK121_CD24/figs/', dev = c('png','pdf')}
+umap_cols <- cols[levels(get("CK121_CD24")@active.ident)]
+DimPlot(get("CK121_CD24"), reduction="umap", cols = umap_cols[], label=FALSE)
+```
+
+# Merged-sample report
+```{r merge}
+# Merge ind
+SeuratObject <- merge(x=get(x = snames[1]), y=sapply(snames[-1], get), add.cell.ids = snames)
+# Clean mem
+rm(list = snames)
+```
+
+## Figures
+
+```{r, mkdir_figs}
+FIGS_OUTDIR <- paste0(OUTDIR,"/figs")
+if(! dir.exists(FIGS_OUTDIR)) dir.create(FIGS_OUTDIR, recursive = TRUE)
+```
+
+```{r merged_cell_prop, fig.width=10, fig.height=4, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+cell_pop <- table(SeuratObject$orig.ident,Idents(SeuratObject))
+cell_pop_perc <- (sweep(cell_pop,MARGIN = 1, STATS = rowSums(cell_pop), FUN = "/")) * 100
+cell_pop_perc2 <- reshape2::melt(cell_pop_perc)
+cell_pop_perc2$Var1 <- relevel(cell_pop_perc2$Var1, ref = "CK5_organoid")
+
+
+ggplot(cell_pop_perc2, aes(x= Var1, fill=Var2, y=value)) +
+    geom_col(position = position_stack(reverse=TRUE)) + 
+	     scale_fill_manual(values = cols[levels(cell_pop_perc2$Var2)]) +
+  labs(y="Percentage of cells (%)") + theme_bw() + coord_flip() +
+  theme(legend.title = element_blank(),legend.text = element_text(size=10),
+	legend.key.size = unit(0.5, "cm"),
+        axis.title.x = element_text(size=18, color = "black"), axis.title.y = element_blank(),
+        axis.text.x = element_text(size=14, color = "black"),
+        axis.text.y = element_text(size=12, color = "black"),
+        panel.grid = element_blank())
+# Create output table
+colnames(cell_pop_perc2) <- c("sample", "population", "percentage")
+
+cell_pop2 <- reshape2::melt(cell_pop)
+cell_pop2$Var1 <- relevel(cell_pop2$Var1, ref = "CK5_organoid")
+
+colnames(cell_pop2) <- c("sample", "population", "num_cells")
+
+
+# Reorder
+stopifnot(dim(cell_pop2) == dim(cell_pop_perc2))
+
+cell_pop2 <- cell_pop2[order(cell_pop2$sample,
+                             cell_pop2$population), ]
+cell_pop_perc2 <- cell_pop_perc2[order(cell_pop_perc2$sample,
+                                       cell_pop_perc2$population), ]
+
+# Both tables must be same order
+stopifnot( all( (cell_pop2$sample == cell_pop_perc2$sample) & 
+                  (cell_pop2$population == cell_pop_perc2$population))
+)
+
+cell_pop_tab <- cbind(cell_pop2, percentage=cell_pop_perc2$percentage)
+# Remove absent populations from the tab
+cell_pop_tab <- cell_pop_tab[cell_pop_tab$num_cells!=0, ]
+
+write.table(cell_pop_tab,
+            file="./output/merged/tubuloid_cell_populations_desc.tsv", sep="\t",
+            row.names = FALSE, col.names = TRUE, quote=FALSE)
+```
+
+ 
+
+```{r merged_context_dotplot_final, fig.width=14, fig.height=12, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+context_genes <- getGmt("./data/Prior/Kramann_context.gmt")
+# Reorder groups
+proj_ident_uniq <- unique(SeuratObject$proj_ident)
+SeuratObject$proj_ident <- factor(SeuratObject$proj_ident,
+                                  levels = c(grep("CK5_",proj_ident_uniq, value = TRUE),
+                                             grep("CK119_",proj_ident_uniq, value = TRUE),
+                                             grep("CK120_",proj_ident_uniq, value = TRUE),
+                                             grep("CK121_",proj_ident_uniq, value = TRUE)))
+
+print(DotPlot(SeuratObject, features = unlist(geneIds(context_genes)),
+              group.by = "proj_ident",
+              dot.scale = 12) + 
+        coord_flip() + scale_y_discrete(position = "right") +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+)
+```
+
+```{r merged_CD24_vlnplot_final, fig.width=12, fig.height=12, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+# proj_cols <- setNames(c("blue","red","yellow","green"), unique(SeuratObject$orig.ident))
+# proj_id_cols <- setNames(proj_cols[gsub(".*\\[(.*)\\]","\\1",unique(SeuratObject$proj_ident))],
+#                         unique(SeuratObject$proj_ident))
+# VlnPlot(SeuratObject, features="CD24", group.by = "proj_ident",
+#        cols = proj_id_cols[levels(factor(SeuratObject$proj_ident))])  + NoLegend()
+```
+
+### DotPlots of context-specific biomarkers
+```{r CK121_CD24_context_dotplot_final, fig.width=7, fig.height=12, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+CK121_CD24_cdplot <- DotPlot(subset(SeuratObject, orig.ident == "CK121_CD24"),
+              features = unlist(geneIds(context_genes)), dot.scale = 12,
+              scale.min = 0, scale.max = 100, col.min = -1.5, col.max = 2.5) +
+        coord_flip() + scale_y_discrete(position = "right") +
+      scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+
+print(CK121_CD24_cdplot)
+```
+
+```{r CK120_CD13_context_dotplot_final, fig.width=7, fig.height=12, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+CK120_CD13_cdplot <- DotPlot(subset(SeuratObject, orig.ident == "CK120_CD13"),
+              features = unlist(geneIds(context_genes)), dot.scale = 12,
+              scale.min = 0, scale.max = 100, col.min = -1.5, col.max = 2.5) +
+        coord_flip() + scale_y_discrete(position = "right") +
+      scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+print(CK120_CD13_cdplot)
+```
+
+```{r CK119_organoid_context_dotplot_final, fig.width=7, fig.height=12, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+CK119_organoid_cdplot <- DotPlot(subset(SeuratObject, orig.ident == "CK119_organoid"),
+              features = unlist(geneIds(context_genes)), dot.scale = 12,
+              scale.min = 0, scale.max = 100, col.min = -1.5, col.max = 2.5) +
+        coord_flip() + scale_y_discrete(position = "right") +
+      scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+
+print(CK119_organoid_cdplot)
+```
+
+```{r CK5_organoid_context_dotplot_final, fig.width=7, fig.height=12, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+CK5_organoid_cdplot <- DotPlot(subset(SeuratObject, orig.ident == "CK5_organoid"),
+              features = unlist(geneIds(context_genes)), dot.scale = 12,
+              scale.min = 0, scale.max = 100, col.min = -1.5, col.max = 2.5) +
+        coord_flip() + scale_y_discrete(position = "right") +
+      scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
+        theme(axis.text.x = element_text(angle = 45, hjust = 0))
+
+print(CK5_organoid_cdplot)
+```
+
+
+```{r merged_split_context_dotplot_final, fig.width=21, fig.height=12, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+# CK5_organoid_cdplot <- CK5_organoid_cdplot + labs(y="CK5_organoid") + 
+#  NoLegend() + theme(axis.title.x = element_text(size = 22))
+
+# CK119_organoid_cdplot <- CK119_organoid_cdplot + labs(y="CK119_organoid") + 
+#  NoLegend() + theme(axis.title.x = element_text(size = 24), axis.title.y = element_blank())
+
+# CK120_CD13_cdplot <- CK120_CD13_cdplot + labs(y="CK120_CD13") + 
+#  NoLegend() + theme(axis.title.x = element_text(size = 24), axis.title.y = element_blank())
+
+# CK121_CD24_cdplot <- CK121_CD24_cdplot + labs(y="CK121_CD24") + 
+#  theme(axis.title.x = element_text(size = 24), axis.title.y = element_blank())
+
+plots <- DotPlot_panel(SeuratObject, assay = "RNA",
+                       unlist(geneIds(context_genes)), dot.scale = 12,
+              scale.min = 0, scale.max = 100, col.min = -2.5, col.max = 2.5)
+
+# Reorder plots
+plots <- plots[c("CK5_organoid",
+                     "CK119_organoid",
+                     "CK120_CD13",
+                     "CK121_CD24")]
+# Common scale
+plots <- lapply(plots, function(gg) {
+  gg + coord_flip() + scale_y_discrete(position = "right") +
+    
+  # This is extremely important to use same scaling color for all samples
+  scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
+      
+  theme(axis.text.x = element_text(angle = 45, hjust = 0),
+        plot.title = element_text(size=18, hjust = 0.5))
+  })
+
+# Remove xlab
+plots <- lapply(plots, function(gg) gg + theme(axis.title.x = element_blank()))
+
+# Remove legend from the first three ones
+plots[1:3] <- lapply(plots[1:3], function(gg) gg + NoLegend())
+# Remove y axis title from the last three ones
+plots[-1] <- lapply(plots[-1], function(gg) gg + theme(axis.title.y = element_blank()))
+
+CombinePlots(plots,
+            rel_widths=c(8, 9, 6, 9),
+             ncol = 4)
+```
+
+Heatmap of markers:
+
+```{r merged_heatmap, fig.width=24, fig.height=8, fig.path='./output/merged/figs/', dev = c('png','pdf')}
+heatmap_markers <- getGmt("./data/Prior/Xu_heatmap_markers.gmt")
+
+SeuratObject <- SeuratObject[intersect(rownames(SeuratObject), unlist(geneIds(heatmap_markers))), ]
+SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
+
+CK5_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK5_organoid"),
+           res=NULL, cols=cols,
+           assay="RNA",
+           show_hr = FALSE,
+           GSC=heatmap_markers)
+
+CK119_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK119_organoid"),
+           res=NULL, cols=cols,
+           assay="RNA",
+           show_hr = FALSE,
+           GSC=heatmap_markers)
+
+CK120_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK120_CD13"),
+           res=NULL, cols=cols,
+           assay="RNA",
+           show_hr = FALSE,
+           GSC=heatmap_markers)
+
+CK121_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK121_CD24"),
+           res=NULL, cols=cols,
+           assay="RNA",
+            show_hr = FALSE,
+           GSC=heatmap_markers)
+
+CK5_hp + CK119_hp + CK121_hp + CK120_hp
+
+```
