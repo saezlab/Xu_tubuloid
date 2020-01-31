@@ -75,7 +75,8 @@ PlotModuleScore <- function(SeuratObject, genes, reduction="tsne", tag=NULL) {
 }
 
 # Enhanced DoHeatmap function
-DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, show_hr=TRUE) {
+DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, 
+                       show_hr=TRUE, cols=NULL, width =NULL,name="Expr.") {
   library(ComplexHeatmap)
   
   gg_color_hue <- function(n) {
@@ -91,20 +92,46 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, show_hr=TRUE) {
   
   genes <- unlist(geneIds(GSC))
   genes.cols <- unlist(sapply(names(GSC), function(abbn) rep(abbn, length(geneIds(GSC)[[abbn]]))))
+  genes.cols <- gsub("__","\n",genes.cols)
+  
+  if(all(dim(SeuratObject@assays$RNA@scale.data) == c(0,0))) {
+    SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
+  }
   mat <- SeuratObject@assays[[assay]]@scale.data
   
   if(is.null(res)) {
-    cl <- as.character(SeuratObject@meta.data[,"seurat_clusters"])
+    cl <- as.character(Idents(SeuratObject))
+    cl_num <- FALSE
   } else {
     cl <- as.character(SeuratObject@meta.data[,paste0(assay,"_snn_res.",res)]) 
+    cl_num <- TRUE
   }
   
   # Reorder
-  ord <- order(as.numeric(cl), decreasing = FALSE)
+  if(cl_num) {
+	ord <- order(as.numeric(cl), decreasing = FALSE)
+  } else {
+	ord <- order(cl, decreasing = FALSE)
+  }
   mat <- mat[,ord]
   cl <- cl[ord]
   
-  cl.cols <- setNames(gg_color_hue(length(unique(cl))),unique(as.character(sort(as.numeric(cl)))))
+  if(is.null(cols)) {
+    cl.cols <- gg_color_hue(length(unique(cl)))
+  } else {
+    cl.cols <- cols[unique(cl)]
+  }
+  
+  if(is.null(names(cl.cols))) {
+    if(cl_num) {
+      names(cl.cols) <- unique(as.character(sort(as.numeric(cl))))
+    } else {
+      names(cl.cols) <- unique(as.character(sort(cl)))
+    } 
+  }
+  
+  hr_classes <- genes.cols
+  
   
   common_genes <- intersect(genes,rownames(mat))
   diff_genes <- setdiff(genes, rownames(mat))
@@ -117,20 +144,13 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, show_hr=TRUE) {
   
   hc <- HeatmapAnnotation(df=data.frame("cluster"=cl),col = list("cluster"=cl.cols), show_annotation_name = FALSE,
                           show_legend = FALSE,
+			  height=unit(2, "mm"),
                           annotation_legend_param= list(legend_height = unit(8, "cm"),
                                                         grid_width = unit(5, "mm"),
                                                         title_gp=gpar(fontsize=16),
                                                         # at=c(-2.5,-2,-1,0,1,2,2.5),
                                                         # labels = c("","-2","-1","0","1","2",""),
                                                         labels_gp = gpar(fontsize = 14)))
-  
-  # hr <- rowAnnotation(df=data.frame(markers=genes.cols), show_annotation_name = FALSE)
-  hr_classes <- gsub("\\-?[0-9]+$","",genes.cols)
-  hr_classes <- gsub("^Modulated_","",hr_classes)
-  hr_classes <- gsub("^Healthy_","",hr_classes)
-  hr_classes <- gsub("^(CD8|Mixed|CXCR6)_","",hr_classes)
-  hr_classes <- gsub("^(M2_?|ResLike|Inflammatory_?|TREM_high)-","",hr_classes)
-  
   
   hr <- rowAnnotation(df=data.frame("type"=hr_classes), show_annotation_name = FALSE,
                       col=list("type"=setNames(gg_color_hue2(length(unique(hr_classes))),
@@ -144,13 +164,14 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, show_hr=TRUE) {
   
   f1 <-  circlize::colorRamp2(c(-2,0,+2), c("purple", "black", "yellow"))
   hp <- Heatmap(mat2, cluster_rows = FALSE, cluster_columns = FALSE,col = f1,
-                name="Expression",
-                top_annotation = hc, bottom_annotation = hc,
-                split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(1.5, "mm"), 
-                column_split = factor(cl, levels=unique(cl)), column_title_rot=00, column_gap = unit(0.7, "mm"),
+                name=name,
+                top_annotation = hc, # bottom_annotation = hc,
+                split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(0, "mm"), 
+                column_split = factor(cl, levels=unique(cl)), column_title_rot=ifelse(cl_num,0,90), column_gap = unit(0, "mm"),
                 # left_annotation = rowAnnotation(foo=anno_block(gpar(fill=table(genes.cols)[unique(genes.cols)]),
                 #                                                labels=unique(genes.cols),
                 #                                                labels_gp=gpar(col="white",fontsize=10))),
+                width=width,
                 heatmap_legend_param= list(legend_height = unit(4, "cm"),
                                            title_gp=gpar(fontsize=16),
                                            # at=c(-2.5,-2,-1,0,1,2,2.5),
@@ -167,108 +188,120 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, show_hr=TRUE) {
 }
 
 
-# Enhanced DoHeatmap function
-DoHeatmap3 <- function(SeuratObject, GSC, assay="RNA", res=0.5, show_hr=TRUE) {
-  library(ComplexHeatmap)
+## DotPlot function to visualize across samples the average expression and percentage
+## of cells per cluster from a set of samples. In contrast to default Seurat function,
+## this function provides a list of Seurat-like DotPlots for CombinePlots, so those
+## are shown as individual panels.
+DotPlot_panel <- function (object=SeuratObject, assay = NULL, features,
+                           cols = c("lightgrey", "blue"),
+                           col.min = -2.5, col.max = 2.5, dot.min = 0, dot.scale = 6, 
+                           group.by=NULL, split.by = "orig.ident", color.by="avg.exp.scaled",
+                           scale.by = "radius", scale.min = NA, scale.max = NA) {
   
-  gg_color_hue <- function(n) {
-    hues = seq(15, 375, length = n + 1)
-    hcl(h = hues, l = 65, c = 100)[1:n]
-  }
-  
-  gg_color_hue2 <- function(n) {
-    hues = seq(15, 375, length = n + 1)
-    hcl(h = hues, l = 35, c = 100)[1:n]
-  }
-  
-  gg_color_hue3 <- function(n) {
-    hues = seq(15, 375, length = n + 1)
-    hcl(h = hues, l = 95, c = 100)[1:n]
-  }
-  
-  
-  genes <- unlist(geneIds(GSC))
-  genes.cols <- unlist(sapply(names(GSC), function(abbn) rep(abbn, length(geneIds(GSC)[[abbn]]))))
-  mat <- SeuratObject@assays[[assay]]@scale.data
-  
-  if(is.null(res)) {
-    cl <- as.character(SeuratObject@meta.data[,"seurat_clusters"])
+  if(!is.null(assay)) {
+    if(DefaultAssay(object)!=assay) DefaultAssay(object = object) <- assay
   } else {
-    cl <- as.character(SeuratObject@meta.data[,paste0(assay,"_snn_res.",res)]) 
+    assay <- DefaultAssay(object = object)
   }
   
-  origin <- SeuratObject@meta.data$orig.ident
+  scale.func <- switch(EXPR = scale.by, size = scale_size, 
+                       radius = scale_radius, stop("'scale.by' must be either 'size' or 'radius'"))
+  data.features <- FetchData(object = object, vars = features)
   
-  # Reorder
-  ord <- order(as.numeric(cl), decreasing = FALSE)
-  mat <- mat[,ord]
-  
-  cl <- cl[ord]
-  cl.cols <- setNames(gg_color_hue(length(unique(cl))),unique(as.character(sort(as.numeric(cl)))))
-  
-  origin <- origin[ord]
-  origin.cols <- setNames(gg_color_hue3(length(unique(origin))),
-                          unique(as.character(origin)))
-  
-  common_genes <- intersect(genes,rownames(mat))
-  diff_genes <- setdiff(genes, rownames(mat))
-  
-  mat2 <- rbind(mat[common_genes,],
-                matrix(NA, nrow=length(diff_genes), ncol=ncol(mat),
-                       dimnames=list(diff_genes, colnames(mat)))
-  )
-  mat2 <- mat2[genes,]
-  
-  hc <- HeatmapAnnotation(df=data.frame("cluster"=cl, "origin"=origin),
-                          col = list("cluster"=cl.cols, "origin"=origin.cols),
-                          show_annotation_name = TRUE,annotation_name_side = "left",
-                          show_legend = c(FALSE,TRUE),
-                          annotation_legend_param= list(legend_height = unit(8, "cm"),
-                                                        grid_width = unit(5, "mm"),
-                                                        title_gp=gpar(fontsize=16),
-                                                        # at=c(-2.5,-2,-1,0,1,2,2.5),
-                                                        # labels = c("","-2","-1","0","1","2",""),
-                                                        labels_gp = gpar(fontsize = 14)))
-  
-  # hr <- rowAnnotation(df=data.frame(markers=genes.cols), show_annotation_name = FALSE)
-  hr_classes <- gsub("\\-?[0-9]+$","",genes.cols)
-  hr_classes <- gsub("^Modulated_","",hr_classes)
-  hr_classes <- gsub("^Healthy_","",hr_classes)
-  hr_classes <- gsub("^(CD8|Mixed|CXCR6)_","",hr_classes)
-  hr_classes <- gsub("^(M2_?|ResLike|Inflammatory_?|TREM_high)-","",hr_classes)
-  
-  
-  hr <- rowAnnotation(df=data.frame("type"=hr_classes), show_annotation_name = FALSE,
-                      col=list("type"=setNames(gg_color_hue2(length(unique(hr_classes))),
-                                               unique(hr_classes))),
-                      annotation_legend_param= list(legend_height = unit(4, "cm"),
-                                                    grid_width = unit(5, "mm"),
-                                                    title_gp=gpar(fontsize=16),
-                                                    # at=c(-2.5,-2,-1,0,1,2,2.5),
-                                                    # labels = c("","-2","-1","0","1","2",""),
-                                                    labels_gp = gpar(fontsize = 14)))
-  
-  f1 <-  circlize::colorRamp2(c(-2,0,+2), c("purple", "black", "yellow"))
-  hp <- Heatmap(mat2, cluster_rows = FALSE, cluster_columns = FALSE,col = f1,
-                name="Expression",
-                top_annotation = hc, bottom_annotation = hc,
-                split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(1.5, "mm"), 
-                column_split = factor(cl, levels=unique(cl)), column_title_rot=00, column_gap = unit(0.7, "mm"),
-                # left_annotation = rowAnnotation(foo=anno_block(gpar(fill=table(genes.cols)[unique(genes.cols)]),
-                #                                                labels=unique(genes.cols),
-                #                                                labels_gp=gpar(col="white",fontsize=10))),
-                heatmap_legend_param= list(legend_height = unit(4, "cm"),
-                                           title_gp=gpar(fontsize=16),
-                                           # at=c(-2.5,-2,-1,0,1,2,2.5),
-                                           # labels = c("","-2","-1","0","1","2",""),
-                                           labels_gp = gpar(fontsize = 15)),
-                show_column_names = FALSE, row_names_side = "left",
-                row_names_gp = gpar(fontsize=7))
-  if(show_hr) {
-    hh <- hp + hr 
+  # Cell subpopulation groups
+  data.features$subpop <- if (is.null(x = group.by)) {
+    Idents(object = object)
   } else {
-    hh <- hp
+    object[[group.by, drop = TRUE]]
   }
-  return(hh)
+  if (!is.factor(x = data.features$subpop)) {
+    data.features$subpop <- factor(x = data.features$subpop)
+  }
+  data.features$subpop <- as.vector(x = data.features$subpop)
+  
+  # Grouping for panels
+  data.features$split <- object[[split.by, drop = TRUE]]
+  
+  # Unique ids for subpop per sample
+  data.features$id <- paste0(data.features$split,"::",data.features$subpop)
+  id.levels <- levels(x = data.features$id)
+  
+  # Create tidy data.frame for ggplot2
+  data.plot <- lapply(X = unique(x = data.features$id), FUN = function(ident) {
+    data.use <- data.features[data.features$id == ident,
+                              # 3 are the number of metadata info
+                              1:(ncol(x = data.features) - 3), drop = FALSE]
+    avg.exp <- apply(X = data.use, MARGIN = 2, FUN = function(x) {
+      return(mean(x = expm1(x = x)))
+    })
+    
+    pct.exp <- apply(X = data.use, MARGIN = 2, FUN = Seurat:::PercentAbove, 
+                     threshold = 0)
+    return(list(avg.exp = avg.exp, pct.exp = pct.exp))
+  })
+  names(x = data.plot) <- unique(x = data.features$id)
+  data.plot <- lapply(X = names(x = data.plot), FUN = function(x) {
+    data.use <- as.data.frame(x = data.plot[[x]])
+    data.use$features.plot <- rownames(x = data.use)
+    data.use$id <- x
+    return(data.use)
+  })
+  data.plot <- do.call(what = "rbind", args = data.plot)
+  if (!is.null(x = id.levels)) {
+    data.plot$id <- factor(x = data.plot$id, levels = id.levels)
+  }
+  avg.exp.scaled <- sapply(X = unique(x = data.plot$features.plot),
+                           FUN = function(x) {
+                             data.use <- data.plot[data.plot$features.plot ==
+                                                     x, "avg.exp"]
+                             data.use <- scale(x = data.use)
+                             data.use <- MinMax(data = data.use, min = col.min,
+                                                max = col.max)
+                             return(data.use)
+                           })
+  avg.exp.scaled <- as.vector(x = t(x = avg.exp.scaled))
+  
+  data.plot$avg.exp.scaled <- avg.exp.scaled
+  
+  data.plot$features.plot <- factor(x = data.plot$features.plot, 
+                                    levels = rev(x = features))
+  data.plot$pct.exp[data.plot$pct.exp < dot.min] <- NA
+  data.plot$pct.exp <- data.plot$pct.exp * 100
+  
+  # color.by <- ifelse(test = is.null(x = split.by), yes = "avg.exp.scaled", 
+  #                    no = "colors")
+  if (!is.na(x = scale.min)) {
+    data.plot[data.plot$pct.exp < scale.min, "pct.exp"] <- scale.min
+  }
+  if (!is.na(x = scale.max)) {
+    data.plot[data.plot$pct.exp > scale.max, "pct.exp"] <- scale.max
+  }
+  
+  # Split in panels
+  data.plot$sname <- sapply(data.plot$id, function(z) strsplit(z, split="::")[[1]][1]) 
+  data.plot$id <- sapply(data.plot$id, function(z) strsplit(z, split="::")[[1]][2])
+  
+  dataset.plot <- split(data.plot, data.plot$sname)
+  
+  # Create plots
+  snames <- unique(object[[split.by, drop=TRUE]])
+  plots <- setNames(vector("list",length=length(snames)),
+                    snames)
+  for(sname in snames) {
+    data.plot <- dataset.plot[[sname]]
+    plot <- ggplot(data = data.plot, mapping = aes_string(x = "features.plot", 
+                                                          y = "id")) + 
+      geom_point(mapping = aes_string(size = "pct.exp", color = color.by)) + 
+      scale.func(range = c(0, dot.scale), limits = c(scale.min, scale.max)) + 
+      theme(axis.title.x = element_blank(), 
+            axis.title.y = element_blank()) + guides(size = guide_legend(title = "Percent Expressed")) + 
+      labs(x = "Features", y = "Identity") + theme_cowplot()
+    plot <- plot + scale_color_gradient(low = cols[1], high = cols[2]) + 
+      guides(color = guide_colorbar(title = "Average Expression\n(Scaled)")) +
+      ggtitle(sname)
+    
+    plots[[sname]] <- plot
+  }
+  
+  return(plots)
 }
-
