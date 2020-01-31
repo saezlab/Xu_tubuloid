@@ -1,0 +1,168 @@
+---
+title: "CK5 early organoid: initial clustering"
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and auxiliar functions
+
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(clustree))
+suppressPackageStartupMessages(require(cowplot))
+source("../src/seurat_fx.R")
+```
+
+## Read data into a Seurat Object
+```{r data, cache=FALSE}
+SeuratObject <- getSeuratObject(path = "../data/sc/Organoid/filtered_feature_bc_matrix/",
+                     project_name = "CK5_organoid", 
+                     mt.pattern = "^MT-", min.cells = 5, 
+                     min.features = 200)
+```
+
+## Define output directory
+```{r def_out}
+# Define output directory
+OUTDIR <- paste0("./output/1_initial_clustering/")
+if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
+```
+
+## Quality control
+
+```{r QC,fig.width=14, fig.height=4}
+print(VlnPlot(SeuratObject, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"), ncol = 3))
+
+print(CombinePlots(plots = list(FeatureScatter(SeuratObject, 
+					       feature1 = "nCount_RNA", 
+					       feature2 = "percent.mt"),
+                                FeatureScatter(SeuratObject, 
+					       feature1 = "nCount_RNA", 
+					       feature2 = "nFeature_RNA")))
+)
+```
+
+## Data cleasing: gene and cell filtering
+To avoid unnecessary sparsity and noise in downstream analysis,    
+* We discard cells with low (<200) and high (>6000) number of genes detected to 
+avoid bad quality and doublets, repectively.    
+* We discard genes not detected across cells.    
+For this we use cutoffs in concordance with kidney tissue, where Proximal tubule
+cells might have a high content of mitochondrial genes (<80%). Later we will
+apply diagnostics to see if this is related.
+
+```{r cars}
+nSamples_before <- ncol(SeuratObject)
+SeuratObject <- subset(SeuratObject, nFeature_RNA > 200 & nFeature_RNA < 6000 & percent.mt < 80)
+nSamples_after <- ncol(SeuratObject)
+```
+
+Doing so, `r nSamples_after` out of an initial `r nSamples_before` total were retrieve
+for the analysis, thus discarding a `r (nSamples_before - nSamples_after)` cells.
+
+## Pre-processing the data for cell clustering and cell-type assignment
+First, we normalize the data using default parameters
+```{r norm, cache=FALSE}
+SeuratObject <- NormalizeData(SeuratObject)
+```
+
+Second, we perform a feature selection based on `vst` method to select 
+high variable genes (top 2000) for cell clustering.
+```{r sel, cache=FALSE}
+SeuratObject <- FindVariableFeatures(SeuratObject, selection.method = "vst", nfeatures = 2000)
+
+print(LabelPoints(VariableFeaturePlot(SeuratObject),
+                  points=VariableFeatures(SeuratObject)[1:10],repel = TRUE))
+```
+
+Third, we center and scale the data prior PCA:
+
+```{r scale,cache=FALSE}
+SeuratObject <- Seurat_scaledata(SeuratObject)
+```
+
+Finally we perform PCA, selecting a number of PCs that are relevant based on the
+elbow plot. We tested that our results are not sensitive to this parameter, and
+the arbitrary selection of number of PCs do not change final conclusions.
+```{r pca, cache=FALSE}
+SeuratObject <- RunPCA(SeuratObject, features = VariableFeatures(SeuratObject), npcs = 50)
+print(ElbowPlot(SeuratObject,ndims = 50) + geom_vline(xintercept = 25, col="red"))
+```
+
+We decided to use 25 PCs for the clustering.
+
+## Cell clustering
+We are going to use Shared-Nearest Neighbour with Graph partitioning for cell clustering.
+We run the algorithm with multiple resolutions. Later this is read-out to give 
+an idea how these are consistent from a lower to high number of expected cell populations
+in the sample.   
+
+```{r clust, cache=FALSE}
+SeuratObject <- FindNeighbors(SeuratObject, dims = 1:25)
+SeuratObject <- FindClusters(SeuratObject, resolution = seq(from=0.1, to=1, by=0.1))
+
+# We redefine the final partitioning with resolution 0.5
+SeuratObject$seurat_clusters <- SeuratObject$RNA_snn_res.0.5 
+Idents(SeuratObject) <- SeuratObject$RNA_snn_res.0.5 
+```
+
+We will investigate how the selection of multiple resolutions affects the partition
+into individual cell clusters.
+```{r clustree, fig.width=7, fig.height=10}
+clustree(SeuratObject, prefix = "RNA_snn_res.")
+```
+
+We decided to chose resolution 0.5 for the initial clustering. We will save this 
+output to archive the outcome. Herein, first column is the cell 
+barcode, and rest of columns are clusters where each cell belong to across 
+multiple resolutions. The ones that are active for the study are those related to
+resolution 0.5 (`RNA_snn_res.0.5` and `seurat_clusters`).
+
+```{r clustering_record}
+# 1 Clustering outcome
+write.table(SeuratObject@meta.data[,c(grep("^RNA_snn_res",
+                                           colnames(SeuratObject@meta.data),
+                                           value=TRUE),
+                                      "seurat_clusters"),],
+            file=paste0(OUTDIR,"/init_clustering.tsv"),
+            sep="\t", col.names = NA, row.names=TRUE, quote=TRUE)
+
+# 2 Initial idents (same as seurat_clusters)
+write.table(data.frame("Ident"=SeuratObject@active.ident),
+            file=paste0(OUTDIR,"/active_idents.tsv"),
+            sep="\t", col.names = NA, row.names = TRUE, quote=TRUE)
+```
+
+## Non-linear dim reduction (umap)
+```{r umap, cache=FALSE}
+SeuratObject <- RunUMAP(SeuratObject, dims = 1:25)
+```
+
+## Archive processed data for downstream analysis
+```{r, mkdir_data}
+DATA_DIR <- paste0(OUTDIR,"/data")
+if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
+```
+
+```{r save_S}
+saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+```                                                                                                                                                                                                         
+
+## Session info
+
+```{r}
+sessionInfo()
+{                                                                                                                                                                                                           
+sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
+print(sessionInfo())
+sink()
+}
+```
