@@ -1,0 +1,188 @@
+---
+title: "CK121 sorted CD24+ cells : final cell assignment" 
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+  
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and auxiliar functions
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(GSEABase))
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(ComplexHeatmap))
+suppressPackageStartupMessages(require(clustree))
+suppressPackageStartupMessages(require(cowplot))
+source("../src/seurat_fx.R")
+```
+
+## Load SeuratObject with initial clustering outcome
+```{r load_init}
+SeuratObject <- readRDS("./output/3_refine_clustering//data/SeuratObject.rds")
+```
+## Define output directory
+```{r def_out}
+# Define output directory
+OUTDIR <- paste0("./output/4_final_assignment/")
+if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
+```
+
+
+## Identify the proliferating PT-like cell population
+```{r cell_phase}
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+
+SeuratObject <- CellCycleScoring(SeuratObject, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
+d3 <- DimPlot(SeuratObject, group.by = "Phase") + ggtitle("Cell Cycle Phase")
+d4 <- DimPlot(SeuratObject) + ggtitle("Re-classification")
+
+print(CombinePlots(list(d3,d4)))
+
+```
+
+
+## Cell marker extraction
+We are going to use two methods for the extraction of cell markers.   
+1. Differential gene expression using wilcox test from Seurat. Only positive
+   and consistent markers will be tested (with default parameters).   
+2. GenesorteR to get posterior probabilities for each gene of observing a certain
+cell population.
+
+### 1 wilcox test
+
+```{r wilcox, cache=FALSE}
+up <- setNames(vector("list",length=length(levels(SeuratObject))), 
+               levels(SeuratObject))
+for(idx in names(up)) {
+  up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
+                        ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
+  cols_names <- colnames(up.idx)
+  
+  # Add two extra cols
+  up.idx$cluster <- idx
+  up.idx$gene <- rownames(up.idx)
+  
+  up[[idx]] <- up.idx
+}
+```
+
+### 2 Gene sorter
+
+```{r genesort, cache=FALSE}
+sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
+
+#define a small set of markers
+#mm = getMarkers(sg, quant = 0.975)
+
+#cluster genes and make a heatmap
+#pp = plotMarkerHeat(sg$inputMat, sg$inputClass, mm$markers, clusterGenes=TRUE, outs = TRUE)
+
+#pp$gene_class_info #gene clusters
+
+#the top 25 genes for each cluster by specificity scores
+top_markers = apply(sg$specScore, 2, function(x) names(head(sort(x, decreasing = TRUE), n = 25)))
+
+```
+
+Finally we save the markers for manual exploration:
+
+```{r init_markers_save}
+MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
+if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
+
+# Wilcox
+## TSV
+write.table(do.call("rbind",up)[c("cluster", "gene", cols_names)],
+	    file = paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_wilcox_DEGs_up.csv"),
+	    sep=",", col.names=TRUE, row.names = FALSE, quote=FALSE
+	    )
+## bin
+saveRDS(up, file=paste0(MARKERS_OUTDIR,"/wilcox_up.rds"))
+
+# Genesorter
+saveRDS(sg, file=paste0(MARKERS_OUTDIR,"/genesorter_out.rds"))
+write.table(as.matrix(sg$specScore), 
+	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_specScore.csv"),
+            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
+
+write.table(as.matrix(sg$condGeneProb), 
+	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_condGeneProb.csv"),
+            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
+```
+
+## Final cell assignment
+The final table of markers on the second round of cell clustering give the following results:
+
+| Cluster | rational |
+|:---|:---|
+| Cluster 0 | TPC : 43% AKAP12 |
+| Cluster 1 | TPC : 77% AKAP12, 67% VCAM |
+| Cluster 2 | LOH, TAL cells : PAX8, SLC12A1, UMOD |
+| Cluster 3 | LOH, TAL cells : PAX8, 29% SLC12A1 |
+| Cluster 4 | DCT |
+| Cluster 5 | IC-A |
+| Cluster 6 | PEC cells |
+
+```{r cell_assign2}
+ren_id <- c("0"="TPC_2",
+            "1"="TPC_1",
+            "2"="LOH, TAL cells_1",
+            "3"="LOH, TAL cells_2",
+            "4"="DCT",
+            "5"="IC-A",
+            "6"="PEC")
+SeuratObject <- RenameIdents(SeuratObject, ren_id)
+```
+
+## TSNE
+```{r tsne_final}
+DimPlot(SeuratObject, reduction="tsne")
+```
+
+## UMAP
+```{r umap_final}
+DimPlot(SeuratObject, reduction="umap")
+```
+
+
+## Archive processed data for downstream analysis
+
+```{r assign_outcome}
+write.table(data.frame("assign"=ren_id),
+	    file=paste0(OUTDIR,"/assignment.csv"),
+	    sep=",", col.names = NA, row.names=TRUE, quote=FALSE)
+# final idents
+write.table(data.frame("Ident"=SeuratObject@active.ident,
+		       "seurat_clusters"=SeuratObject$seurat_clusters),
+            file=paste0(OUTDIR,"/active_idents.csv"),
+            sep=",", col.names = NA, row.names = TRUE, quote=TRUE)
+```
+
+```{r, mkdir_data}
+DATA_DIR <- paste0(OUTDIR,"/data")
+if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
+```
+
+```{r save_S}
+saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+```                                                                                                                                                                                                         
+
+## Session info
+
+```{r}
+sessionInfo()
+{                                                                                                                                                                                                           
+sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
+print(sessionInfo())
+sink()
+}
+```
