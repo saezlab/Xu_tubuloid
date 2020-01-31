@@ -166,8 +166,18 @@ Heatmap(as.matrix(sg$condGeneProb)[unlist(reporters),], name="condGeneProb",
 
 ![](4_final_assignment_CK120_CD13_files/figure-gfm/cond_heatmap-1.png)<!-- -->
 
+### TSNE
+
 ``` r
 DimPlot(SeuratObject, reduction="tsne")
+```
+
+![](4_final_assignment_CK120_CD13_files/figure-gfm/tsne_final-1.png)<!-- -->
+
+### UMAP
+
+``` r
+DimPlot(SeuratObject, reduction="umap")
 ```
 
 ![](4_final_assignment_CK120_CD13_files/figure-gfm/umap_final-1.png)<!-- -->

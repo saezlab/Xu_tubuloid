@@ -156,9 +156,16 @@ Heatmap(as.matrix(sg$condGeneProb)[unlist(reporters),], name="condGeneProb",
         )
 ```
 
-```{r umap_final}
+### TSNE
+```{r tsne_final}
 DimPlot(SeuratObject, reduction="tsne")
 ```
+
+### UMAP
+```{r umap_final}
+DimPlot(SeuratObject, reduction="umap")
+```
+
 
 ## Archive processed data for downstream analysis
 
