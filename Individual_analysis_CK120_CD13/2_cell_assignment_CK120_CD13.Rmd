@@ -1,0 +1,202 @@
+---
+title: "CK120 sorted CD13+ cells : cell assignment"
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and auxiliar functions
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(GSEABase))
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(ComplexHeatmap))
+suppressPackageStartupMessages(require(clustree))
+suppressPackageStartupMessages(require(cowplot))
+source("../src/seurat_fx.R")
+```
+
+## Load SeuratObject with initial clustering outcome
+```{r load_init}
+SeuratObject <- readRDS("./output/1_initial_clustering/data/SeuratObject.rds")
+```
+## Define output directory
+```{r def_out}
+# Define output directory
+OUTDIR <- paste0("./output/2_cell_assignment/")
+if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
+```
+
+## Cell marker extraction
+We are going to use two methods for the extraction of cell markers.   
+1. Differential gene expression using wilcox test from Seurat. Only positive
+   and consistent markers will be tested (with default parameters).   
+2. GenesorteR to get posterior probabilities for each gene of observing a certain
+cell population.
+
+### 1 wilcox test
+
+```{r wilcox, cache=FALSE}
+up <- setNames(vector("list",length=length(levels(SeuratObject))), 
+               levels(SeuratObject))
+for(idx in names(up)) {
+  up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
+                        ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
+  cols_names <- colnames(up.idx)
+  
+  # Add two extra cols
+  up.idx$cluster <- idx
+  up.idx$gene <- rownames(up.idx)
+  
+  up[[idx]] <- up.idx
+}
+```
+
+### 2 Gene sorter
+
+```{r genesort, cache=FALSE}
+sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
+
+#define a small set of markers
+#mm = getMarkers(sg, quant = 0.975)
+
+#cluster genes and make a heatmap
+#pp = plotMarkerHeat(sg$inputMat, sg$inputClass, mm$markers, clusterGenes=TRUE, outs = TRUE)
+
+#pp$gene_class_info #gene clusters
+
+#the top 25 genes for each cluster by specificity scores
+top_markers = apply(sg$specScore, 2, function(x) names(head(sort(x, decreasing = TRUE), n = 25)))
+
+```
+
+Finally we save the markers for manual exploration:
+
+```{r init_markers_save}
+MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
+if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
+
+# Wilcox
+for(idx in names(up)) {
+  write.table(up[[idx]][,c("cluster", "gene", cols_names)],
+              file = paste0(MARKERS_OUTDIR,"/cluster",idx,".tsv"),
+              sep="\t",col.names = TRUE, row.names = FALSE, quote=FALSE
+  )
+}
+saveRDS(up, file=paste0(MARKERS_OUTDIR,"/wilcox_up.rds"))
+
+# Genesorter
+saveRDS(sg, file=paste0(MARKERS_OUTDIR,"/genesorter_out.rds"))
+write.table(as.matrix(sg$specScore), paste0(MARKERS_OUTDIR,"/specScore.tsv"),
+            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+
+write.table(as.matrix(sg$condGeneProb), paste0(MARKERS_OUTDIR,"/condGeneProb.tsv"),
+            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+```
+
+
+## Cell assignment
+We took a look at the markers from the different clusters from previous section. These can be found in the `r MARKERS_OUTDIR` directory.
+
+We took a look at the markes from previous section, making the following summary
+
+| Cluster | rational |
+|:---:|:---:|
+| Cluster 0 | proximal tubule (SLC5a2, PT-S1) |
+| Cluster 1 | proximal tubule (SLC5a2, PT-S1) |
+| Cluster 2 | proximal tubule (SLC5a2, PT-S1) |
+| Cluster 3 | proximal tubule (SLC5a2, PT-S2) |
+| Cluster 4 | proximal tubule  AGT+,SLC 22a6, PT-S3 |
+| Cluster 5 | proximal tubule (SLC5a2PT-S1) |
+| Cluster 6 | exclude endothelium |
+
+```{r reports}
+reporters <- list("PT-S1"=c("SLC5A2"),
+                  "PT-S2"=c("SLC22A6"),
+                  "PT-S3"=c("AGT"),
+                  "Endothelial"=c("PECAM1"))
+```
+
+```{r cond_heatmap}
+# condGeneProb from genesorteR
+Heatmap(as.matrix(sg$condGeneProb)[unlist(reporters),], name="condGeneProb",
+        col=c("white","red"),row_names_gp = gpar(fontsize=10),
+        cluster_rows = FALSE, cluster_columns = FALSE,
+        split = factor(unlist(sapply(names(reporters), function(z) rep(z,length(reporters[[z]])))),
+                       levels=names(reporters)),
+        row_title_rot = 0,row_gap = unit(0, "mm"),border=TRUE
+        )
+```
+
+```{r expr_heatmap}
+DoHeatmap2(SeuratObject, 
+           GS=GeneSetCollection(sapply(names(reporters), 
+                                       function(gs) GeneSet(unique(reporters[[gs]]), 
+                                                            setName=gs))),
+           assay = "RNA", res = 0.5
+           )
+```
+
+The expression of PECAM1 reaveals cell cluster 6 as endothelial cells,
+which are contaminant and are removed afterwards.
+
+
+```{r rename_idents}
+ren_id <- c("0"="PT_S1_1",
+            "1"="PT_S1_2",
+            "2"="PT_S1_3",
+            "3"="PT_S1_4",
+            "4"="PT_S2_1",
+            "5"="PT_S2_2",
+            "6"="Exclude_endothelial")
+```
+
+
+```{r cell_ann}
+SeuratObject <- RenameIdents(SeuratObject, ren_id)
+SeuratObject$init_assign <- Idents(SeuratObject)
+```
+
+
+## UMAP plot
+```{r}
+DimPlot(SeuratObject, reduction = "umap", label=TRUE)
+```
+
+## Archive processed data for downstream analysis
+
+```{r assign_record}
+# new idents
+write.table(data.frame("Ident"=SeuratObject@active.ident),
+            file=paste0(OUTDIR,"/active_idents.tsv"),
+            sep="\t", col.names = NA, row.names = TRUE, quote=TRUE)
+```
+
+```{r, mkdir_data}
+DATA_DIR <- paste0(OUTDIR,"/data")
+if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
+```
+
+```{r save_S}
+saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+```                                                                                                                                                                                                         
+
+## Session info
+
+```{r}
+sessionInfo()
+{                                                                                                                                                                                                           
+sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
+print(sessionInfo())
+sink()
+}
+```
