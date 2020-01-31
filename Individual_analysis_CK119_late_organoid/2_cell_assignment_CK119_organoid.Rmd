@@ -1,0 +1,222 @@
+---
+title: "CK119 late organoid : cell assignment"
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and auxiliar functions
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(GSEABase))
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(ComplexHeatmap))
+suppressPackageStartupMessages(require(clustree))
+suppressPackageStartupMessages(require(cowplot))
+source("../src/seurat_fx.R")
+```
+
+## Load SeuratObject with initial clustering outcome
+```{r load_init}
+SeuratObject <- readRDS("./output/1_initial_clustering/data/SeuratObject.rds")
+```
+## Define output directory
+```{r def_out}
+# Define output directory
+OUTDIR <- paste0("./output/2_cell_assignment/")
+if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
+```
+
+## Cell marker extraction
+We are going to use two methods for the extraction of cell markers.   
+1. Differential gene expression using wilcox test from Seurat. Only positive
+   and consistent markers will be tested (with default parameters).   
+2. GenesorteR to get posterior probabilities for each gene of observing a certain
+cell population.
+
+### 1 wilcox test
+
+```{r wilcox, cache=FALSE}
+up <- setNames(vector("list",length=length(levels(SeuratObject))), 
+               levels(SeuratObject))
+for(idx in names(up)) {
+  up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
+                        ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
+  cols_names <- colnames(up.idx)
+  
+  # Add two extra cols
+  up.idx$cluster <- idx
+  up.idx$gene <- rownames(up.idx)
+  
+  up[[idx]] <- up.idx
+}
+```
+
+### 2 Gene sorter
+
+```{r genesort, cache=FALSE}
+sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
+
+#define a small set of markers
+#mm = getMarkers(sg, quant = 0.975)
+
+#cluster genes and make a heatmap
+#pp = plotMarkerHeat(sg$inputMat, sg$inputClass, mm$markers, clusterGenes=TRUE, outs = TRUE)
+
+#pp$gene_class_info #gene clusters
+
+#the top 25 genes for each cluster by specificity scores
+top_markers = apply(sg$specScore, 2, function(x) names(head(sort(x, decreasing = TRUE), n = 25)))
+
+```
+
+Finally we save the markers for manual exploration:
+
+```{r init_markers_save}
+MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
+if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
+
+# Wilcox
+## TSV
+write.table(do.call("rbind",up)[c("cluster", "gene", cols_names)],
+	    file = paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_wilcox_DEGs_up.csv"),
+	    sep=",", col.names=TRUE, row.names = FALSE, quote=FALSE
+	    )
+## bin
+saveRDS(up, file=paste0(MARKERS_OUTDIR,"/wilcox_up.rds"))
+
+# Genesorter
+saveRDS(sg, file=paste0(MARKERS_OUTDIR,"/genesorter_out.rds"))
+write.table(as.matrix(sg$specScore), 
+	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_specScore.csv"),
+            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
+
+write.table(as.matrix(sg$condGeneProb), 
+	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_condGeneProb.csv"),
+            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
+```
+
+
+## Cell assignment
+We took a look at the markers from the different clusters from previous section. These can be found in the `r MARKERS_OUTDIR` directory.
+
+We took a look at the markes from previous section, making the following summary
+
+| Cluster | rational |
+|:---:|:---:|
+| Cluster 0 | Pax2+! , SLC34a2 17%, 43% Pax1+, Col4a3+, SCN2A+, TPC |
+| Cluster 1 | SLC34a2 40%, 51% ANPEP, TPC |
+| Cluster 2 | SLC34a2 14%, proliferating PT (S/G2M) |
+| Cluster 3 | SLC34a2 low, Anxa3 high TPC |
+| Cluster 4 | SLC34a2 37%, 43% Pax2+ PT-like/TPC |
+| Cluster 5 | SLC34a2 low PT like/TPC |
+| Cluster 6 | SLC34a2 19%, 12% Pax2, proliferating PT (S/G2M) |
+| Cluster 7 | no Pax8, no SLC34a2  unknown |
+| Cluster 8 | SLC34a2 low, 24% Pax2+ - PT like/TPC |
+| Cluster 9 | SLC14A1 33% (all others no) , SLC34a2 17%, 66% VCAM1 (all others no VCAM1), 38% AQP1 (all others no AQP1),  PEC-like |
+
+
+```{r reports}
+reporters <- list("TPC"=c("PAX2", "SLC34A2", "COL4A3", "SCN2A",
+                              "ANPEP"),
+                  "Prolif.TPC"=c("SLC34A2", "PAX2","MKI67", "CENPF", "CDKN3", 
+                                     "BIRC5", "CDC20",
+                                     "NUSAP1", "AKAP12"),
+                  "PEC-like"=c("SLC14A1", "SLC34A2", "VCAM1", "AQP1"),
+                  "Others"=c("PAX8", "SLC34A2"))
+```
+
+
+```{r cond_heatmap}
+# condGeneProb from genesorteR
+Heatmap(as.matrix(sg$condGeneProb)[unlist(reporters),], name="condGeneProb",
+        col=c("white","red"),row_names_gp = gpar(fontsize=10),
+        cluster_rows = FALSE, cluster_columns = FALSE,
+        split = factor(unlist(sapply(names(reporters), function(z) rep(z,length(reporters[[z]])))),
+                       levels=names(reporters)),
+        row_title_rot = 0,row_gap = unit(0, "mm"),border=TRUE
+        )
+```
+
+```{r expr_heatmap}
+DoHeatmap2(SeuratObject, 
+           GS=GeneSetCollection(sapply(names(reporters), 
+                                       function(gs) GeneSet(unique(reporters[[gs]]), 
+                                                            setName=gs))),
+           assay = "RNA", res = 0.5
+           )
+```
+
+None of the cell populations were discarded, but just the population of cluster 8
+ is kept as unknown. Thus, actually the refinement of cell assignment is not 
+ needed for this sample.
+ 
+```{r rename_idents}
+ren_id <- c("0"="TPC_1",
+            "1"="TPC_2",
+            "2"="Prolif.TPC_1",
+            "3"="TPC_4",
+            "4"="TPC_3",
+            "5"="TPC_5",
+            "6"="Prolif.TPC_2",
+            "7"="Unknown",
+            "8"="Prolif.TPC_3",
+            "9"="PEC-like")
+```
+
+
+
+```{r cell_ann}
+SeuratObject <- RenameIdents(SeuratObject, ren_id)
+SeuratObject$init_assign <- Idents(SeuratObject)
+```
+
+
+## UMAP plot
+```{r}
+DimPlot(SeuratObject, reduction = "umap", label=TRUE)
+```
+
+## TSNE plot
+```{r}
+DimPlot(SeuratObject, reduction = "tsne", label=TRUE)
+```
+
+
+## Archive processed data for downstream analysis
+```{r assign_record}
+# new idents
+write.table(data.frame("Ident"=SeuratObject@active.ident,
+		       "seurat_clusters"=SeuratObject$seurat_clusters),
+            file=paste0(OUTDIR,"/active_idents.csv"),
+            sep=",", col.names = NA, row.names = TRUE, quote=TRUE)
+```
+
+```{r, mkdir_data}
+DATA_DIR <- paste0(OUTDIR,"/data")
+if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
+```
+
+```{r save_S}
+saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+```                                                                                                                                                                                                         
+
+## Session info
+
+```{r}
+sessionInfo()
+{                                                                                                                                                                                                           
+sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
+print(sessionInfo())
+sink()
+}
+```
