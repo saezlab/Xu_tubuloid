@@ -153,8 +153,18 @@ ren_id <- c("0"="TPC_1",
 SeuratObject <- RenameIdents(SeuratObject, ren_id)
 ```
 
+### TSNE
+
 ``` r
 DimPlot(SeuratObject, reduction="tsne")
+```
+
+![](4_final_assignment_CK5_organoid_files/figure-gfm/tsne_final-1.png)<!-- -->
+
+### UMAP
+
+``` r
+DimPlot(SeuratObject, reduction="umap")
 ```
 
 ![](4_final_assignment_CK5_organoid_files/figure-gfm/umap_final-1.png)<!-- -->

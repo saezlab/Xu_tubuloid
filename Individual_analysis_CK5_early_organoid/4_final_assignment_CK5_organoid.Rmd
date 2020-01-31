@@ -145,8 +145,14 @@ ren_id <- c("0"="TPC_1",
 SeuratObject <- RenameIdents(SeuratObject, ren_id)
 ```
 
-```{r umap_final}
+### TSNE
+```{r tsne_final}
 DimPlot(SeuratObject, reduction="tsne")
+```
+
+### UMAP
+```{r umap_final}
+DimPlot(SeuratObject, reduction="umap")
 ```
 
 
