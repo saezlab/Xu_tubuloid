@@ -1,0 +1,131 @@
+---
+title: "CK5 early organoid : Refine cell clustering"
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+  
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and auxiliar functions
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(GSEABase))
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(ComplexHeatmap))
+suppressPackageStartupMessages(require(clustree))
+suppressPackageStartupMessages(require(cowplot))
+source("../src/seurat_fx.R")
+```
+
+## Load SeuratObject with initial clustering outcome
+```{r load_init}
+SeuratObject <- readRDS("./output/2_cell_assignment/data/SeuratObject.rds")
+```
+## Define output directory
+```{r def_out}
+# Define output directory
+OUTDIR <- paste0("./output/3_refine_clustering/")
+if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
+```
+
+## Re-clustering and high dim. reduction after filtering contaminant populations
+
+To trace back previous cell boundaries, we store the outcome
+```{r init_cl}
+if(!"init_seurat_clusters" %in% colnames(SeuratObject@meta.data))
+  SeuratObject$init_seurat_clusters <- SeuratObject$seurat_clusters
+
+if(!"init_assign" %in% colnames(SeuratObject@meta.data))
+  SeuratObject$init_assign <- Idents(SeuratObject)
+```
+
+We remove two cell populations that present with over-expression of genes related to bad quality cells.
+We observed that cluster 5 over-express high mitochondrial genes, whereas cluster 9 over-express ribosomal genes.
+
+```{r assign_filter}
+# Remove original reference to clustering
+SeuratObject <- SeuratObject[, !grepl("^(Exclude)", 
+                                      Idents(SeuratObject))]
+```
+
+We proceed with the standard pipeline for cell clustering, over-written previous
+outcome
+
+```{r re_clust, cache=FALSE, fig.width=11, fig.height=4}
+## Feature selection
+SeuratObject <- FindVariableFeatures(SeuratObject, selection.method = "vst", nfeatures = 2000)
+
+## PCA 
+SeuratObject <- RunPCA(SeuratObject, features = VariableFeatures(SeuratObject), npcs = 50)
+print(ElbowPlot(SeuratObject,ndims = 50) + geom_vline(xintercept = 25, col="red"))
+
+## Cell clustering
+SeuratObject <- FindNeighbors(SeuratObject, dims = 1:25)
+SeuratObject <- FindClusters(SeuratObject, resolution = 0.5)
+
+## Agreement with previous clustering
+table("initial"=SeuratObject$init_seurat_clusters,
+      "final"=SeuratObject$seurat_clusters)
+
+table("Assigned"=SeuratObject$init_assign,
+      "final"=SeuratObject$seurat_clusters)
+
+
+## UMAP
+SeuratObject <- RunUMAP(SeuratObject, dims = 1:25)
+d1 <- DimPlot(SeuratObject, group.by = "init_assign") + ggtitle("Initial Cell assignment")
+d2 <- DimPlot(SeuratObject) + ggtitle("Re-classification")
+
+print(CombinePlots(list(d1,d2)))
+
+## tSNE
+SeuratObject <- RunTSNE(SeuratObject, dims = 1:25)
+d1 <- DimPlot(SeuratObject, group.by = "init_assign", reduction="tsne") + ggtitle("Initial Cell assignment")
+d2 <- DimPlot(SeuratObject, reduction="tsne") + ggtitle("Re-classification")
+
+print(CombinePlots(list(d1,d2)))
+
+```
+
+## Archive processed data for downstream analysis
+```{r clustering_record}
+# 1 Clustering outcome
+write.table(SeuratObject@meta.data[,c(grep("^RNA_snn_res",
+                                           colnames(SeuratObject@meta.data),
+                                           value=TRUE),
+                                      "seurat_clusters"),],
+            file=paste0(OUTDIR,"/init_clustering.csv"),
+            sep=",", col.names = NA, row.names=TRUE, quote=TRUE)
+
+# 2 2nd round idents (same as seurat_clusters)
+write.table(data.frame("Ident"=SeuratObject@active.ident),
+            file=paste0(OUTDIR,"/active_idents.csv"),
+            sep=",", col.names = NA, row.names = TRUE, quote=TRUE)
+```
+
+```{r, mkdir_data}
+DATA_DIR <- paste0(OUTDIR,"/data")
+if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
+```
+
+```{r save_S}
+saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+```                                                                                                                                                                                                         
+
+## Session info
+
+```{r}
+sessionInfo()
+{                                                                                                                                                                                                           
+sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
+print(sessionInfo())
+sink()
+}
+```
