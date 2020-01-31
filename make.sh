@@ -12,11 +12,10 @@ export RSTUDIO_PANDOC=/usr/lib/rstudio/bin/pandoc
 
 # Get all bash scripts within the project to be run one by one
 echo -e "[INFO] : Finding bash scripts to build markdowns for reproducible analysis.";
-runs=`find $PWD_project/Individual_analysis_* -name run_rmd.sh`;
 
 # Run one by one all the 
 echo -e "[INFO] : Running individual analysis...";
-for run_sh in "${runs[@]}";do
+for run_sh in `find $PWD_project/Individual_analysis_* -name run_rmd.sh`;do
 	echo -e "[INFO] \t Starting with '$(dirname $(basename $run_sh))' at $(date)";
 	cd $(dirname $run_sh);
 	bash $(basename $run_sh);
