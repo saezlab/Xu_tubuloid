@@ -36,11 +36,11 @@ the 25 principal components into 2-dimensional space, showing the cell cluster l
 ## Usage
 You might take a look at the `markdown` reports (`.md` files) included within this repository. This consists on the individual single-cell analysis of four samples, each one goes through a bioinformatics analysis to identify cell type populations from the kidney in the samples. Finaly, a merged analysis with the four samples is performed to create the final figures for the manuscript.
 
-* [Individual analysis of sorted CD13+ cells]("./Individual_analysis_CK120_CD13")
-* [Individual analysis of sorted CD24+ cells]("./Individual_analysis_CK121_CD24")
-* [Individual analysis of early organoid]("./Individual_analysis_CK5_early_organoid")
-* [Individual analysis of late organoid]("./Individual_analysis_CK119_late_organoid")
-* [Merged analysis to make figures for the manuscript]("./Merged_analysis")
+* [Individual analysis of sorted CD13+ cells](Individual_analysis_CK120_CD13)
+* [Individual analysis of sorted CD24+ cells](Individual_analysis_CK121_CD24)
+* [Individual analysis of early organoid](Individual_analysis_CK5_early_organoid)
+* [Individual analysis of late organoid](Individual_analysis_CK119_late_organoid)
+* [Merged analysis to make figures for the manuscript](Merged_analysis)
 
 
 Alternatively, you can reproduce the results following these instructions. Please note that this is going to over-write the markdowns from the repository:
