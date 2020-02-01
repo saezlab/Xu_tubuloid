@@ -1,4 +1,4 @@
-# Bioinformatics single-cell RNA-seq analysis on Tubuloid-derived samples
+# Bioinformatics analysis on Tubuloid-derived single-cell RNA-seq samples
 The following samples were profiled at the single-cell resolution:
 * CK5 early organoid. Organoid generated from CD24+ sorted cells from human adult kidney tissue at an early stage.
 * CK119 late organoid. Organoid generated from CD24+ sorted cells from human adult kidney tissue at a late stage.
@@ -34,13 +34,23 @@ the 25 principal components into 2-dimensional space, showing the cell cluster l
 > 3. Tirosh I, Izar B, Prakadan SM, Wadsworth MH, Treacy D, Trombetta JJ, Rotem A, Rodman C, Lian C, Murphy G, Fallahi-Sichani M, Dutton-Regester K, Lin JR, Cohen O, Shah P, Lu D, Genshaft AS, Hughes TK, Ziegler CG, Kazer SW, Gaillard A, Kolb KE, Villani AC, Johannessen CM, Andreev AY, Van Allen EM, Bertagnolli M, Sorger PK, Sullivan RJ, Flaherty KT, Frederick DT, Jané-Valbuena J, Yoon CH, Rozenblatt-Rosen O, Shalek AK, Regev A, Garraway LA. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science. 2016 Apr 8;352(6282):189-96
 
 ## Usage
-You can reproduce the results following these instructions:
-1. [Optionally] Download the raw 10x data (FastQ files). Then preprocess as stated in the material and methods section.
-2. Download the data matrices from CellRanger, that are included in the supplementary files from the GEO entry.
-3. Run the shuttle to build the html rmarkdowns reports
+You might take a look at the `markdown` reports (`.md` files) included within this repository. This consists on the individual single-cell analysis of four samples, each one goes through a bioinformatics analysis to identify cell type populations from the kidney in the samples. Finaly, a merged analysis with the four samples is performed to create the final figures for the manuscript.
+
+* [Individual analysis of sorted CD13+ cells]("./Individual_analysis_CK120_CD13")
+* [Individual analysis of sorted CD24+ cells]("./Individual_analysis_CK121_CD24")
+* [Individual analysis of early organoid]("./Individual_analysis_CK5_early_organoid")
+* [Individual analysis of late organoid]("./Individual_analysis_CK119_late_organoid")
+* [Merged analysis to make figures for the manuscript]("./Merged_analysis")
+
+
+Alternatively, you can reproduce the results following these instructions. Please note that this is going to over-write the markdowns from the repository:
+
+1. [Optionally] Request access to the raw sequencing 10x data (FastQ files) to Rafael Kramann following the manuscript details. Then preprocess the data following your preferences.
+2. Download the data matrices from CellRanger. The processed data with gene expression values are available at https://doi.org/10.6084/m9.figshare.11786238. These data must be located in `./data/sc/`.
+3. Run the make script to re-build the html rmarkdowns reports
 
 ```bash
-bash run_rmd.sh
+bash make.sh
 ```
 
 ## Environment
