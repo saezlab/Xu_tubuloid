@@ -33,6 +33,9 @@ the 25 principal components into 2-dimensional space, showing the cell cluster l
 > 2. MM Ibrahim and  Kramann R. genesorteR: Feature Ranking in Clustered Single Cell Data. bioRxiv
 > 3. Tirosh I, Izar B, Prakadan SM, Wadsworth MH, Treacy D, Trombetta JJ, Rotem A, Rodman C, Lian C, Murphy G, Fallahi-Sichani M, Dutton-Regester K, Lin JR, Cohen O, Shah P, Lu D, Genshaft AS, Hughes TK, Ziegler CG, Kazer SW, Gaillard A, Kolb KE, Villani AC, Johannessen CM, Andreev AY, Van Allen EM, Bertagnolli M, Sorger PK, Sullivan RJ, Flaherty KT, Frederick DT, Jané-Valbuena J, Yoon CH, Rozenblatt-Rosen O, Shalek AK, Regev A, Garraway LA. Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq. Science. 2016 Apr 8;352(6282):189-96
 
+## Data availability
+Processed gene expression values from the single-cell RNA-seq are available at https://doi.org/10.6084/m9.figshare.11786238
+
 ## Usage
 You might take a look at the `markdown` reports (`.md` files) included within this repository. This consists on the individual single-cell analysis of four samples, each one goes through a bioinformatics analysis to identify cell type populations from the kidney in the samples. Finaly, a merged analysis with the four samples is performed to create the final figures for the manuscript.
 

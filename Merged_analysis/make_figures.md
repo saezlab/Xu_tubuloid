@@ -240,39 +240,35 @@ SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
 
 CK5_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK5_organoid"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(25,"mm"),name="",
+           assay="RNA",
            show_hr = FALSE,
            GSC=heatmap_markers)
 
 CK119_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK119_organoid"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(41,"mm"),name="",
+           assay="RNA",
            show_hr = FALSE,
            GSC=heatmap_markers)
 
 CK120_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK120_CD13"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(52,"mm"),name="",
+           assay="RNA",
            show_hr = FALSE,
            GSC=heatmap_markers)
 
 CK121_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK121_CD24"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(22,"mm"),name="",
+           assay="RNA",
             show_hr = FALSE,
            GSC=heatmap_markers)
 
-ht_list <- CK5_hp + CK119_hp + CK121_hp + CK120_hp
+CK5_hp + CK119_hp + CK121_hp + CK120_hp
 ```
 
-    ## Warning: Heatmap/annotation names are duplicated:
+    ## Warning: Heatmap/annotation names are duplicated: Expr.
 
-    ## Warning: Heatmap/annotation names are duplicated: ,
+    ## Warning: Heatmap/annotation names are duplicated: Expr., Expr.
 
-    ## Warning: Heatmap/annotation names are duplicated: , ,
-
-``` r
-draw(ht_list, ht_gap = unit(0.6, "mm"))
-```
+    ## Warning: Heatmap/annotation names are duplicated: Expr., Expr., Expr.
 
 ![](./output/figs/merged_heatmap-1.png)<!-- -->

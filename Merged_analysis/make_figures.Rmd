@@ -187,7 +187,7 @@ CombinePlots(plots,
 
 ### Heatmap of markers:
 
-```{r merged_heatmap, fig.width=9.4, fig.height=8, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
+```{r merged_heatmap, fig.width=24, fig.height=8, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
 heatmap_markers <- getGmt("../data/Prior/Xu_heatmap_markers.gmt")
 
 SeuratObject <- SeuratObject[intersect(rownames(SeuratObject), unlist(geneIds(heatmap_markers))), ]
@@ -195,29 +195,27 @@ SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
 
 CK5_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK5_organoid"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(25,"mm"),name="",
+           assay="RNA",
            show_hr = FALSE,
            GSC=heatmap_markers)
 
 CK119_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK119_organoid"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(41,"mm"),name="",
+           assay="RNA",
            show_hr = FALSE,
            GSC=heatmap_markers)
 
 CK120_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK120_CD13"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(52,"mm"),name="",
+           assay="RNA",
            show_hr = FALSE,
            GSC=heatmap_markers)
 
 CK121_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK121_CD24"),
            res=NULL, cols=cols,
-           assay="RNA", width = unit(22,"mm"),name="",
+           assay="RNA",
             show_hr = FALSE,
            GSC=heatmap_markers)
 
-ht_list <- CK5_hp + CK119_hp + CK121_hp + CK120_hp
-draw(ht_list, ht_gap = unit(0.6, "mm"))
-
+CK5_hp + CK119_hp + CK121_hp + CK120_hp
 ```
