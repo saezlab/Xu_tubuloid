@@ -250,19 +250,19 @@ CK119_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK119_
            show_hr = FALSE,
            GSC=heatmap_markers)
 
-CK120_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK120_CD13"),
-           res=NULL, cols=cols,
-           assay="RNA",
-           show_hr = FALSE,
-           GSC=heatmap_markers)
-
 CK121_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK121_CD24"),
            res=NULL, cols=cols,
            assay="RNA",
             show_hr = FALSE,
            GSC=heatmap_markers)
 
-CK5_hp + CK119_hp + CK121_hp + CK120_hp
+CK120_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK120_CD13"),
+           res=NULL, cols=cols,
+           assay="RNA",
+           show_hr = TRUE,
+           GSC=heatmap_markers)
+
+draw(CK5_hp + CK119_hp + CK121_hp + CK120_hp, heatmap_legend_side="bottom", annotation_legend_side = "bottom")
 ```
 
     ## Warning: Heatmap/annotation names are duplicated: Expr.

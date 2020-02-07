@@ -76,7 +76,9 @@ PlotModuleScore <- function(SeuratObject, genes, reduction="tsne", tag=NULL) {
 
 # Enhanced DoHeatmap function
 DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, 
-                       show_hr=TRUE, cols=NULL, width =NULL,name="Expr.") {
+                       show_hr=TRUE, cols=NULL, width =NULL,name="Expr.",
+                       row_names_fontisze=12,
+                       legend.dir="horizontal") {
   library(ComplexHeatmap)
   
   gg_color_hue <- function(n) {
@@ -156,17 +158,18 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
                       col=list("type"=setNames(gg_color_hue2(length(unique(hr_classes))),
                                                unique(hr_classes))),
                       annotation_legend_param= list(legend_height = unit(4, "cm"),
-                                                    grid_width = unit(5, "mm"),
+                                                    grid_height = unit(10, "mm"),
                                                     title_gp=gpar(fontsize=16),
+                                                    direction = legend.dir, ncol=4,
                                                     # at=c(-2.5,-2,-1,0,1,2,2.5),
                                                     # labels = c("","-2","-1","0","1","2",""),
-                                                    labels_gp = gpar(fontsize = 14)))
+                                                    labels_gp = gpar(fontsize = 22)))
   
   f1 <-  circlize::colorRamp2(c(-2,0,+2), c("purple", "black", "yellow"))
   hp <- Heatmap(mat2, cluster_rows = FALSE, cluster_columns = FALSE,col = f1,
                 name=name,
                 top_annotation = hc, # bottom_annotation = hc,
-                split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(0, "mm"), 
+                # split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(0, "mm"), 
                 column_split = factor(cl, levels=unique(cl)), column_title_rot=ifelse(cl_num,0,90), column_gap = unit(0, "mm"),
                 # left_annotation = rowAnnotation(foo=anno_block(gpar(fill=table(genes.cols)[unique(genes.cols)]),
                 #                                                labels=unique(genes.cols),
@@ -174,11 +177,12 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
                 width=width,
                 heatmap_legend_param= list(legend_height = unit(4, "cm"),
                                            title_gp=gpar(fontsize=16),
+                                           direction=legend.dir,
                                            # at=c(-2.5,-2,-1,0,1,2,2.5),
                                            # labels = c("","-2","-1","0","1","2",""),
-                                           labels_gp = gpar(fontsize = 15)),
+                                           labels_gp = gpar(fontsize = 18)),
                 show_column_names = FALSE, row_names_side = "left",
-                row_names_gp = gpar(fontsize=7))
+                row_names_gp = gpar(fontsize=row_names_fontisze))
   if(show_hr) {
     hh <- hp + hr 
   } else {
