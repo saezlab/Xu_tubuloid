@@ -168,7 +168,9 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
   f1 <-  circlize::colorRamp2(c(-2,0,+2), c("purple", "black", "yellow"))
   hp <- Heatmap(mat2, cluster_rows = FALSE, cluster_columns = FALSE,col = f1,
                 name=name,
-                top_annotation = hc, # bottom_annotation = hc,
+		use_raster=FALSE,
+                top_annotation = hc, 
+#  		bottom_annotation = hc,
                 # split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(0, "mm"), 
                 column_split = factor(cl, levels=unique(cl)), column_title_rot=ifelse(cl_num,0,90), column_gap = unit(0, "mm"),
                 # left_annotation = rowAnnotation(foo=anno_block(gpar(fill=table(genes.cols)[unique(genes.cols)]),
@@ -308,4 +310,102 @@ DotPlot_panel <- function (object=SeuratObject, assay = NULL, features,
   }
   
   return(plots)
+}
+
+#' Save markers as individual CSV files 
+#' 
+#' @param x a list from loop-wilcox or genesorteR::sortGenes()
+#' @param OUTDIR the output directory path
+#' @examples
+#' saveMarkers.CSV(x, "/output")
+saveMarkers.CSV <- function(x, OUTDIR) {
+	## Folder to store data
+	MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
+	if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
+
+	if(is.list(x)) {
+		if(all(c("condGeneProb", "postClustProb", "specScore") %in% names(x))) {
+			# Genesorter
+			write.table(as.matrix(x$specScore), paste0(MARKERS_OUTDIR,"/specScore.tsv"),
+				    sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+
+			write.table(as.matrix(x$condGeneProb), paste0(MARKERS_OUTDIR,"/condGeneProb.tsv"),
+				    sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+		} else {
+			# List of DEGs via wilcox
+		    for(idx in names(x)) {
+			    firstgofirst <- c("cluster", "gene")
+			    remaining <- setdiff(colnames(x[[idx]]), firstgofirst)
+			    col_names <- c(firstgofirst, remaining)
+			write.table(x[[idx]][,col_names],
+				    file = paste0(MARKERS_OUTDIR,"/cluster",idx,".tsv"),
+		    		    sep="\t",col.names = TRUE, row.names = FALSE, quote=FALSE)
+		    }
+		}
+	} else {
+		stop("ERROR: Only list is allowed\n")
+	}
+}
+
+
+#' Save markers as in Excel file
+#'
+#' @param up list with each FindMarkers() each
+#' @param sg list object from genesorteR
+#' @param SeuratObject with IDents() and $seurat_clusters
+#' @param OUTDIR output directory path
+#' @examples
+#' saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+
+saveMarkers.Excel <- function(up, sg, SeuratObject, OUTDIR) {
+
+	## Folder to store data
+	MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
+	if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
+
+	## Excel file
+	xlsx_file <- paste0(OUTDIR, "/", Project(SeuratObject), "_markers.xlsx")
+	wb <- createWorkbook()
+
+	NclusterNcells <- table(SeuratObject$seurat_clusters)
+
+	IdentClust <- levels(SeuratObject$seurat_clusters)
+	IdentSet <- levels(Idents(SeuratObject))
+
+	# 1st sheet
+	sheet1 <- data.frame(Cluster=paste0("cluster", IdentClust),
+			     Ncells=as.numeric(NclusterNcells),
+			     Perc=as.numeric(NclusterNcells)/sum(NclusterNcells)*100,
+			     Assignment=rep("?", length(NclusterNcells)),
+			     Markers=rep("?", length(NclusterNcells)))
+	if(!all(IdentClust==IdentSet)) sheet1$Assignment <- IdentSet;
+
+	addWorksheet(wb, sheetName = "Assignment")
+	writeData(wb, sheet ="Assignment", x=sheet1, rowNames=FALSE)
+
+	# GeneSorteR
+	specScore <- as.matrix(sg$specScore)
+	colnames(specScore) <- paste0("cluster", colnames(specScore))
+	addWorksheet(wb, sheetName = "genesorteR_specScore")
+	writeData(wb, sheet ="genesorteR_specScore", x=specScore, rowNames=TRUE)
+
+	condGeneProb <- as.matrix(sg$condGeneProb)
+	colnames(condGeneProb) <- paste0("cluster", colnames(condGeneProb))
+	addWorksheet(wb, sheetName = "genesorteR_condGeneProb")
+	writeData(wb, sheet ="genesorteR_condGeneProb", x=condGeneProb, rowNames=TRUE)
+
+	# Wilcox
+	for(idx in names(up)) {
+		addWorksheet(wb, sheetName = paste0("wilcox_cluster",idx))
+
+			    firstgofirst <- c("cluster", "gene")
+			    remaining <- setdiff(colnames(x[[idx]]), firstgofirst)
+			    col_names <- c(firstgofirst, remaining)
+		writeData(wb, sheet = paste0("wilcox_cluster",idx), 
+			  x=up[[idx]][,c("cluster", "gene", col_names)], 
+			  rowNames=FALSE)
+	}
+
+	saveWorkbook(wb, file =  xlsx_file, overwrite = TRUE)
+
 }
