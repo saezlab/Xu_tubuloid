@@ -399,7 +399,7 @@ saveMarkers.Excel <- function(up, sg, SeuratObject, OUTDIR) {
 		addWorksheet(wb, sheetName = paste0("wilcox_cluster",idx))
 
 			    firstgofirst <- c("cluster", "gene")
-			    remaining <- setdiff(colnames(x[[idx]]), firstgofirst)
+			    remaining <- setdiff(colnames(up[[idx]]), firstgofirst)
 			    col_names <- c(firstgofirst, remaining)
 		writeData(wb, sheet = paste0("wilcox_cluster",idx), 
 			  x=up[[idx]][,c("cluster", "gene", col_names)], 
