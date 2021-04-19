@@ -1,4 +1,4 @@
-CK119 late healthy organoid : cell assignment
+CK119 late organoid : final cell assignment
 ================
 Javier Perales-Patón - <javier.perales@bioquant.uni-heidelberg.de> -
 ORCID: 0000-0003-0780-6683
@@ -22,14 +22,14 @@ source("../src/seurat_fx.R")
 ## Load SeuratObject with initial clustering outcome
 
 ``` r
-SeuratObject <- readRDS("./output/1_initial_clustering/data/SeuratObject.rds")
+SeuratObject <- readRDS("./output/3_refine_clustering//data/SeuratObject.rds")
 ```
 
 ## Define output directory
 
 ``` r
 # Define output directory
-OUTDIR <- paste0("./output/2_cell_assignment/")
+OUTDIR <- paste0("./output/4_final_assignment/")
 if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
 ```
 
@@ -46,16 +46,16 @@ a certain cell population.
 
 ``` r
 up <- setNames(vector("list",length=length(levels(SeuratObject))), 
-                levels(SeuratObject))
+               levels(SeuratObject))
 for(idx in names(up)) {
   up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
                         ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
   cols_names <- colnames(up.idx)
-   
+  
   # Add two extra cols
   up.idx$cluster <- idx
   up.idx$gene <- rownames(up.idx)
-   
+  
   up[[idx]] <- up.idx
 }
 ```
@@ -81,61 +81,27 @@ saveMarkers.CSV(up, OUTDIR)
 saveMarkers.CSV(sg, OUTDIR)
 ```
 
-## Cell assignment
+## Final cell assignment
 
-We took a look at the markers from the different clusters from previous
-section. These can be found in the ./output/2\_cell\_assignment/
-directory.
-
-We took a look at the markes from previous section, making the following
-summary
-
-| Cluster |                                                      rational                                                       |
-| :-----: | :-----------------------------------------------------------------------------------------------------------------: |
-| Cluster |                               Pax2+\! , SLC34a2 17%, 43% Pax1+, Col4a3+, SCN2A+, TPC                                |
-| Cluster |                                             SLC34a2 40%, 51% ANPEP, TPC                                             |
-| Cluster |                                        SLC34a2 14%, proliferating PT (S/G2M)                                        |
-| Cluster |                                             SLC34a2 low, Anxa3 high TPC                                             |
-| Cluster |                                         SLC34a2 37%, 43% Pax2+ PT-like/TPC                                          |
-| Cluster |                                               SLC34a2 low PT like/TPC                                               |
-| Cluster |                                   SLC34a2 19%, 12% Pax2, proliferating PT (S/G2M)                                   |
-| Cluster |                                             no Pax8, no SLC34a2 unknown                                             |
-| Cluster |                                        SLC34a2 low, 24% Pax2+ - PT like/TPC                                         |
-| Cluster | SLC14A1 33% (all others no) , SLC34a2 17%, 66% VCAM1 (all others no VCAM1), 38% AQP1 (all others no AQP1), PEC-like |
-
-``` r
-FeaturePlot(SeuratObject, 
-        features=c("percent.mt", "nFeature_RNA", 
-               "S.Score", "G2M.Score"), 
-        label=TRUE, label.size=7)
-```
-
-    ## Warning: Using `as.character()` on a quosure is deprecated as of rlang 0.3.0.
-    ## Please use `as_label()` or `as_name()` instead.
-    ## This warning is displayed once per session.
-
-![](2_cell_assignment_CK119_organoid_files/figure-gfm/cellQual-1.png)<!-- -->
-
-``` r
-VlnPlot(SeuratObject, features=c("S.Score", "G2M.Score"))
-```
-
-![](2_cell_assignment_CK119_organoid_files/figure-gfm/CellCycle-1.png)<!-- -->
+The final table of markers on the second round of cell clustering give
+the following results:
 
 ``` r
 ren_id <- c("0"="TPC_1",
             "1"="Prolif.TPC_1",
             "2"="TPC_2",
-            "3"="TPC_3",
-            "4"="TPC_4",
+            "3"="TPC_4",
+            "4"="TPC_3",
             "5"="Prolif.TPC_2",
             "6"="Epith.Unknown",
-            "7"="TPC_5:LowQual",
-            "8"="Prolif.TPC_3:LowQual",
-            "9"="PEC-like")
+            "7"="PEC-like"
+            )
 ```
 
 ``` r
+stopifnot(all(names(ren_id) %in% levels(SeuratObject)))
+stopifnot(length(ren_id) == length(levels(SeuratObject)))
+
 SeuratObject <- RenameIdents(SeuratObject, ren_id)
 SeuratObject$init_assign <- factor(as.character(Idents(SeuratObject)))
 
@@ -156,7 +122,7 @@ AdultOrganoid <- AdultOrganoid[unlist(lapply(geneIds(AdultOrganoid), length)) > 
 DoMultiHeatmap(SeuratObject, sg, GSC = AdultOrganoid, assay = "RNA", show_plot = TRUE)
 ```
 
-![](2_cell_assignment_CK119_organoid_files/figure-gfm/AdultOrganoid_mhp-1.png)<!-- -->
+![](4_final_assignment_files/figure-gfm/AdultOrganoid_mhp-1.png)<!-- -->
 
     ## NULL
 
@@ -167,7 +133,7 @@ DoMultiDotPlot(SeuratObject, sg, GSC = AdultOrganoid)
     ## Scale for 'size' is already present. Adding another scale for 'size',
     ## which will replace the existing scale.
 
-![](2_cell_assignment_CK119_organoid_files/figure-gfm/AdultOrganoid_dplot-1.png)<!-- -->
+![](4_final_assignment_files/figure-gfm/AdultOrganoid_dplot-1.png)<!-- -->
 
 ``` r
 DoClustReport(SeuratObject, sg, AdultOrganoid, show_NCells=TRUE)
@@ -193,7 +159,7 @@ DoClustReport(SeuratObject, sg, AdultOrganoid, show_NCells=TRUE)
     ## 
     ##     combine
 
-![](2_cell_assignment_CK119_organoid_files/figure-gfm/ClustReport-1.png)<!-- -->
+![](4_final_assignment_files/figure-gfm/ClustReport-1.png)<!-- -->
 
 ## UMAP plot
 
@@ -202,15 +168,20 @@ DimPlot(SeuratObject, reduction = "umap", label=TRUE) +
     coord_cartesian(clip = "off")
 ```
 
-![](2_cell_assignment_CK119_organoid_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
+    ## Warning: Using `as.character()` on a quosure is deprecated as of rlang 0.3.0.
+    ## Please use `as_label()` or `as_name()` instead.
+    ## This warning is displayed once per session.
+
+![](4_final_assignment_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
 ## Archive processed data for downstream analysis
 
 ``` r
-# new idents
-write.table(data.frame("Ident"=SeuratObject@active.ident),
-            file=paste0(OUTDIR,"/active_idents.tsv"),
-            sep="\t", col.names = NA, row.names = TRUE, quote=TRUE)
+# final idents
+write.table(data.frame("Ident"=SeuratObject@active.ident,
+               "seurat_clusters"=SeuratObject$seurat_clusters),
+            file=paste0(OUTDIR,"/active_idents.csv"),
+            sep=",", col.names = NA, row.names = TRUE, quote=TRUE)
 ```
 
 ``` r
