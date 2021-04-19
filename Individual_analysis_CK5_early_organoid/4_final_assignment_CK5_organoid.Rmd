@@ -1,6 +1,6 @@
 ---
 title: "CK5 early organoid : final cell assignment" 
-author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+author: "Javier Perales-Patón - javier.perales@bioquant.uni-heidelberg.de - ORCID: 0000-0003-0780-6683" 
 license: "GPL-v3"
 output: github_document
 ---
@@ -21,6 +21,7 @@ suppressPackageStartupMessages(require(genesorteR))
 suppressPackageStartupMessages(require(ComplexHeatmap))
 suppressPackageStartupMessages(require(clustree))
 suppressPackageStartupMessages(require(cowplot))
+suppressPackageStartupMessages(require(openxlsx))
 source("../src/seurat_fx.R")
 ```
 
@@ -33,20 +34,6 @@ SeuratObject <- readRDS("./output/3_refine_clustering//data/SeuratObject.rds")
 # Define output directory
 OUTDIR <- paste0("./output/4_final_assignment/")
 if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
-```
-
-
-## Identify the proliferating PT-like cell population
-```{r cell_phase}
-s.genes <- cc.genes$s.genes
-g2m.genes <- cc.genes$g2m.genes
-
-SeuratObject <- CellCycleScoring(SeuratObject, s.features = s.genes, g2m.features = g2m.genes, set.ident = FALSE)
-d3 <- DimPlot(SeuratObject, group.by = "Phase") + ggtitle("Cell Cycle Phase")
-d4 <- DimPlot(SeuratObject) + ggtitle("Re-classification")
-
-print(CombinePlots(list(d3,d4)))
-
 ```
 
 
@@ -79,44 +66,13 @@ for(idx in names(up)) {
 
 ```{r genesort, cache=FALSE}
 sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
-
-#define a small set of markers
-#mm = getMarkers(sg, quant = 0.975)
-
-#cluster genes and make a heatmap
-#pp = plotMarkerHeat(sg$inputMat, sg$inputClass, mm$markers, clusterGenes=TRUE, outs = TRUE)
-
-#pp$gene_class_info #gene clusters
-
-#the top 25 genes for each cluster by specificity scores
-top_markers = apply(sg$specScore, 2, function(x) names(head(sort(x, decreasing = TRUE), n = 25)))
-
 ```
 
 Finally we save the markers for manual exploration:
-
-```{r init_markers_save}
-MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
-if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
-
-# Wilcox
-## TSV
-write.table(do.call("rbind",up)[c("cluster", "gene", cols_names)],
-	    file = paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_wilcox_DEGs_up.csv"),
-	    sep=",", col.names=TRUE, row.names = FALSE, quote=FALSE
-	    )
-## bin
-saveRDS(up, file=paste0(MARKERS_OUTDIR,"/wilcox_up.rds"))
-
-# Genesorter
-saveRDS(sg, file=paste0(MARKERS_OUTDIR,"/genesorter_out.rds"))
-write.table(as.matrix(sg$specScore), 
-	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_specScore.csv"),
-            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
-
-write.table(as.matrix(sg$condGeneProb), 
-	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_condGeneProb.csv"),
-            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
+```{r init_markers_save, warning=FALSE}
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+saveMarkers.CSV(up, OUTDIR)
+saveMarkers.CSV(sg, OUTDIR)
 ```
 
 ## Final cell assignment
@@ -124,37 +80,66 @@ The final table of markers on the second round of cell clustering give the follo
 
 | Cluster | rational |
 |:---|:---|
-| Cluster 0 | TPC |
-| Cluster 1 | TPC |
-| Cluster 2 | DCT (GATA3, SLC12A3, KRT19) |
-| Cluster 3 | DCT (SPP1, SLC12A3) |
-| Cluster 4 | TPC |
-| Cluster 5 | Proliferating TPC |
-| Cluster 6 | PEC-like |
-| Cluster 7 | PEC-like |
+| Cluster | TPC |
+| Cluster | TPC |
+| Cluster | DCT (GATA3, SLC12A3, KRT19) |
+| Cluster | DCT (SPP1, SLC12A3) |
+| Cluster | TPC |
+| Cluster | Proliferating TPC |
+| Cluster | PEC-like |
+| Cluster | PEC-like |
 
-```{r cell_assign2}
+```{r rename_idents}
 ren_id <- c("0"="TPC_1",
-            "1"="TPC_2",
-            "2"="DCT_1",
-            "3"="DCT_2",
+            "1"="DCT-like_1",
+            "2"="DCT-like_2",
+            "3"="TPC_2",
             "4"="TPC_3",
             "5"="Prolif.TPC",
             "6"="PEC-like_1",
-            "7"="PEC-like_2")
+            "7"="PEC-like_2"
+            )
+```
+
+
+
+```{r cell_ann}
+stopifnot(all(names(ren_id) %in% levels(SeuratObject)))
+stopifnot(length(ren_id) == length(levels(SeuratObject)))
+
 SeuratObject <- RenameIdents(SeuratObject, ren_id)
+SeuratObject$init_assign <- factor(as.character(Idents(SeuratObject)))
+
+colnames(sg$condGeneProb) <- ren_id[colnames(sg$condGeneProb)]
+colnames(sg$specScore) <- ren_id[colnames(sg$specScore)]
 ```
 
-### TSNE
-```{r tsne_final}
-DimPlot(SeuratObject, reduction="tsne")
+```{r load_markers}
+AdultOrganoid <- getGmt("../data/Prior/adultorganoid_markers.gmt")
+AdultOrganoid <- GeneSetCollection(lapply(AdultOrganoid, function(GS) {
+			  GS@geneIds <- intersect(GS@geneIds, rownames(SeuratObject))
+			  return(GS)
+	    }))
+AdultOrganoid <- AdultOrganoid[unlist(lapply(geneIds(AdultOrganoid), length)) > 0]
 ```
 
-### UMAP
-```{r umap_final}
-DimPlot(SeuratObject, reduction="umap")
+```{r AdultOrganoid_mhp, fig.width=16, fig.height=14, dpi=300, warning=FALSE}
+DoMultiHeatmap(SeuratObject, sg, GSC = AdultOrganoid, assay = "RNA", show_plot = TRUE)
 ```
 
+```{r AdultOrganoid_dplot, fig.width=16, fig.height=14, dpi=300, warning=FALSE}
+DoMultiDotPlot(SeuratObject, sg, GSC = AdultOrganoid)
+```
+
+```{r ClustReport, fig.width=16, fig.height=17, dpi=300, warning=FALSE}
+DoClustReport(SeuratObject, sg, AdultOrganoid, show_NCells=TRUE)
+```
+
+## UMAP plot
+```{r}
+DimPlot(SeuratObject, reduction = "umap", label=TRUE) +
+	coord_cartesian(clip = "off")
+```
 
 ## Archive processed data for downstream analysis
 
@@ -173,7 +158,12 @@ if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
 
 ```{r save_S}
 saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
-```                                                                                                                                                                                                         
+saveRDS(up, file=paste0(OUTDIR,"/wilcox_up.rds"))
+saveRDS(sg, file=paste0(OUTDIR,"/genesorter_out.rds"))
+
+# After Rename Idents
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+```
 
 ## Session info
 

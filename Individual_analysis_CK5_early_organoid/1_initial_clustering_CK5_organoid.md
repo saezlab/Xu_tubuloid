@@ -1,6 +1,7 @@
-CK5 early organoid: initial clustering
+CK5 early healthy organoid: initial clustering
 ================
-Javier Perales-Paton - <javier.perales@bioquant.uni-heidelberg.de>
+Javier Perales-Patón - <javier.perales@bioquant.uni-heidelberg.de> -
+ORCID: 0000-0003-0780-6683
 
 ## Load libraries and auxiliar functions
 
@@ -58,16 +59,16 @@ detected to avoid bad quality and doublets, repectively.
 \* We discard genes not detected across cells.  
 For this we use cutoffs in concordance with kidney tissue, where
 Proximal tubule cells might have a high content of mitochondrial genes
-(\<80%). Later we will apply diagnostics to see if this is related.
+(\<20%). Later we will apply diagnostics to see if this is related.
 
 ``` r
 nSamples_before <- ncol(SeuratObject)
-SeuratObject <- subset(SeuratObject, nFeature_RNA > 200 & nFeature_RNA < 6000 & percent.mt < 80)
+SeuratObject <- subset(SeuratObject, nFeature_RNA > 200 & nFeature_RNA < 6000 & percent.mt < 20)
 nSamples_after <- ncol(SeuratObject)
 ```
 
-Doing so, 2736 out of an initial 2792 total were retrieve for the
-analysis, thus discarding a 56 cells.
+Doing so, 2403 out of an initial 2792 total were retrieve for the
+analysis, thus discarding a 389 cells.
 
 ## Pre-processing the data for cell clustering and cell-type assignment
 
@@ -115,40 +116,40 @@ SeuratObject <- RunPCA(SeuratObject, features = VariableFeatures(SeuratObject), 
 ```
 
     ## PC_ 1 
-    ## Positive:  NEAT1, KCNQ1OT1, CLU, C3, LTF, CP, MUC1, ADAMTS1, SPP1, SLC34A2 
-    ##     PIGR, SLC3A1, C1R, SERPING1, CDH16, COL4A3, NCOA7, C1S, SAA1, SAA2 
-    ##     TNFAIP2, SLPI, IFI44L, IL4I1, SOD2, SCTR, WFDC2, BIRC3, GPNMB, LCN2 
-    ## Negative:  TUBA1B, CFL1, RAN, H2AFZ, TUBB, S100A16, JPT1, HMGA1, TXN, ACTB 
-    ##     TMSB4X, PFN1, OAZ1, SNRPB, CALM1, KRT18, ARPC2, RANBP1, HMGB1, C12orf75 
-    ##     LSM4, RPS26, EIF5A, TUBB4B, MYL12A, PHLDA2, GSTP1, STMN1, CCND1, SNRPD1 
+    ## Positive:  TUBA1B, H2AFZ, RAN, TUBB, CFL1, HMGA1, JPT1, KRT18, ACTB, CENPW 
+    ##     S100A16, BIRC5, TK1, RANBP1, ARPC2, LSM4, CKS1B, DTYMK, TUBB4B, SRSF3 
+    ##     CCND1, KRT8, CDKN3, OAZ1, TUBA1C, TMSB4X, SNRPB, PHLDA2, TXN, PFN1 
+    ## Negative:  CLU, NEAT1, SPP1, LTF, C3, SLC34A2, SLPI, MUC1, BCAM, KCNQ1OT1 
+    ##     CP, SERPING1, SOD2, ADAMTS1, WFDC2, IFITM3, SAA1, SLC3A1, SAA2, C1R 
+    ##     NCOA7, PIGR, CDH16, SERPINA1, GPNMB, ANXA4, LCN2, TMEM37, C1S, FTL 
     ## PC_ 2 
-    ## Positive:  FN1, IL32, SPARC, CDH6, MAP1B, TPM1, RAB3B, FLG, TMSB10, KRT23 
-    ##     TUBA1A, SLIT3, THY1, CDH2, MFGE8, DCBLD2, S100A6, PLA2G16, CALD1, AKAP12 
-    ##     EMP3, RPS27L, SH3BGRL3, OCIAD2, RHOC, CRYAB, SPOCK2, ITIH5, CYTL1, GLIPR2 
-    ## Negative:  MKI67, HMGB2, CENPF, TOP2A, NUSAP1, CDC20, UBE2C, PBK, CDCA3, DLGAP5 
-    ##     GTSE1, PLK1, HMMR, DEPDC1, TPX2, ASPM, BIRC5, AURKB, CCNB1, CCNB2 
-    ##     CDKN3, CCNA2, SPC25, RRM2, ANLN, NUF2, CEP55, NEK2, CENPE, TK1 
+    ## Positive:  FN1, IL32, MAP1B, TPM1, RAB3B, SPARC, CDH6, TMSB10, DCBLD2, FLG 
+    ##     CDH2, MFGE8, TUBA1A, KRT23, AKAP12, THY1, SLIT3, CALD1, S100A6, SPOCK2 
+    ##     ITIH5, RHOC, C6orf99, EMP3, GLIPR2, THBS2, SH3BGRL3, CD70, CYTL1, PTGIS 
+    ## Negative:  WFDC2, HMGB2, MKI67, CENPF, NUSAP1, TOP2A, CDCA3, CDC20, PBK, UBE2C 
+    ##     AGR2, MNS1, DLGAP5, AURKB, PLK1, HMMR, BCAM, DEFB1, TPX2, CCNB1 
+    ##     DEPDC1, CCNB2, GTSE1, BIRC5, ASPM, CDKN3, CCNA2, SPC25, ANP32E, TK1 
     ## PC_ 3 
-    ## Positive:  SPARC, FLG, THY1, CDH2, SLIT3, CENPF, PTGIS, ITIH5, CD70, MKI67 
-    ##     CYTL1, MAP1B, ASPM, SEPT4, CRB2, IGFBP4, VCAM1, TOP2A, THBS2, NUSAP1 
-    ##     GTSE1, FN1, DEPDC1, CDC20, DPYSL3, CD14, TM4SF4, PLK1, BCAT1, HMMR 
-    ## Negative:  TSPAN1, RAB25, CLDN7, S100A14, EPCAM, AGR2, TACSTD2, KRT7, WFDC2, TMPRSS4 
-    ##     SAT1, GPRC5A, CLDN4, MUC1, KITLG, PRSS8, UCP2, SFTA2, KRT19, GATA3 
-    ##     CST6, SMIM22, ITGB6, CDH1, MPZL2, ITGA2, SFN, KRTCAP3, MAL2, KLK6 
+    ## Positive:  SPARC, FLG, THY1, CENPF, CDH2, ITIH5, MKI67, CD70, SLIT3, VCAM1 
+    ##     ASPM, NUSAP1, PTGIS, DEPDC1, HMGB2, TOP2A, GTSE1, CDC20, CYTL1, CRB2 
+    ##     PTTG1, SPC25, PLK1, IGFBP4, CDKN3, UBE2C, HMMR, SEPT4, CCNA2, PBK 
+    ## Negative:  TSPAN1, CLDN7, RAB25, S100A14, KRT7, TACSTD2, GPRC5A, TMPRSS4, EPCAM, CLDN4 
+    ##     CST6, ITGA2, PRSS8, KRT19, CDH1, MAL2, UCA1, UCP2, SFTA2, MACC1 
+    ##     PROM2, SAT1, SCEL, ITGB6, CDA, AGR2, VTCN1, ST14, SFN, GATA3 
     ## PC_ 4 
-    ## Positive:  FLG, THY1, SLIT3, KRT23, PTGIS, ITIH5, SPARC, CYTL1, CD14, C6orf99 
-    ##     CRB2, IGFBP4, SEPT4, AP1M2, UPK3B, FGF18, PRRX2, KRT19, TMOD1, BCAT1 
-    ##     UPK1B, SNCA, CFTR, GATA3, RGS5, SOX17, LHX1, NGFR, AC005482.1, TM4SF4 
-    ## Negative:  SERPINE2, MT2A, GYPC, PLAU, EMP3, CXCL14, VIM, GMDS, MT1E, PHLDA1 
-    ##     GLRX, CLDN16, XKR4, TRIM55, ADIRF, TM4SF1, LGALS1, TPM1, PKIB, IGFBP6 
-    ##     SAA1, HTRA1, ANPEP, GCHFR, SLC34A2, MSMP, TSPAN8, CRYAB, NNMT, S100A6 
+    ## Positive:  FLG, THY1, SLIT3, ITIH5, KRT23, PTGIS, SPARC, CD14, CYTL1, CRB2 
+    ##     IGFBP4, C6orf99, PRRX2, FGF18, SEPT4, AP1M2, UPK3B, KRT19, TMOD1, BCAT1 
+    ##     SNCA, NGFR, BCAM, CFTR, MAF, RGS5, CD74, AC005482.1, UPK1B, DEFB1 
+    ## Negative:  SERPINE2, MT2A, PLAU, GYPC, EMP3, VIM, CXCL14, PHLDA1, MT1E, TRIM55 
+    ##     XKR4, GMDS, PKIB, ANPEP, CLDN16, GLRX, TPM1, TM4SF1, LGALS1, DCBLD2 
+    ##     HTRA1, ADIRF, S100A6, SPON1, TNC, GCHFR, ITGA3, MSMP, TGFBI, IGFBP6 
     ## PC_ 5 
-    ## Positive:  DBI, LDHB, ANXA4, SPP1, CLU, NNMT, SERPINA1, WFDC2, FTL, LDHA 
-    ##     SLPI, PDZK1IP1, RPS2, RPL21, SOD2, GSTM3, TMEM37, DEFB1, TNFSF10, LCN2 
-    ##     HLA-DMB, MYL12B, ENO1, PRDX1, HIST1H4C, AGR2, S100A11, PGK1, ID2, CLDN10 
-    ## Negative:  PLAU, PLEC, AREG, LAMC2, DCBLD2, KLF6, F3, MFGE8, WNT7A, AKAP12 
-    ##     UCA1, AL161431.1, EREG, KRTAP2-3, HMGA2, HSPG2, SCEL, RAB3B, LAMA3, PXDN 
-    ##     PLAT, CCND1, ITGB8, ITGB4, CST6, PMEPA1, ARL4C, TRBC2, GAS6, ITGA2
+    ## Positive:  LDHB, DBI, NNMT, ATP5F1B, PRDX1, MYL12B, ENO1, ANXA4, CPVL, SLC25A5 
+    ##     PSMA7, SPP1, HSPE1, RPS2, ACAT2, RPL21, LDHA, FDPS, TNFSF10, GSTM3 
+    ##     CD9, NQO1, UCHL1, HLA-DMB, FHL2, GSTP1, NDUFA9, ANXA2, FDFT1, CCT2 
+    ## Negative:  NEAT1, SOX4, TOP2A, MKI67, UBE2C, ASPM, NDRG1, HSPG2, AREG, PLK1 
+    ##     MFGE8, GTSE1, KIF23, TPX2, UCA1, KIF2C, KLF6, KNL1, CDCA8, AURKA 
+    ##     HJURP, ANLN, AURKB, CENPF, CCNA2, CENPA, RAB3B, TMEM132A, MMP14, DEPDC1
 
 ``` r
 print(ElbowPlot(SeuratObject,ndims = 50) + geom_vline(xintercept = 25, col="red"))
@@ -157,6 +158,27 @@ print(ElbowPlot(SeuratObject,ndims = 50) + geom_vline(xintercept = 25, col="red"
 ![](1_initial_clustering_CK5_organoid_files/figure-gfm/pca-1.png)<!-- -->
 
 We decided to use 25 PCs for the clustering.
+
+We also calculate a dissociation
+score
+
+``` r
+dissociation <- read.csv("../data/Prior/scrnaseq-digestion-paper_coregene_df-FALSE-v3.csv",
+             stringsAsFactors=FALSE)
+dissTop40 <- intersect(head(dissociation$gene_symbol, 40), rownames(SeuratObject))
+SeuratObject <- AddModuleScore(SeuratObject, features = list("dissociation"=dissTop40))
+colnames(SeuratObject@meta.data)[which(colnames(SeuratObject@meta.data)=="Cluster1")] <- "Dissociation"
+```
+
+And cellcycle phase
+
+``` r
+s.genes <- cc.genes$s.genes
+g2m.genes <- cc.genes$g2m.genes
+SeuratObject <- CellCycleScoring(SeuratObject,
+                 s.features = s.genes,
+                 g2m.features = g2m.genes)
+```
 
 ## Cell clustering
 
@@ -180,71 +202,62 @@ SeuratObject <- FindClusters(SeuratObject, resolution = seq(from=0.1, to=1, by=0
 
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.9422
+    ## Maximum modularity in 10 random starts: 0.9399
     ## Number of communities: 4
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.9133
-    ## Number of communities: 6
+    ## Maximum modularity in 10 random starts: 0.9057
+    ## Number of communities: 5
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.8872
-    ## Number of communities: 8
+    ## Maximum modularity in 10 random starts: 0.8759
+    ## Number of communities: 7
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.8673
+    ## Maximum modularity in 10 random starts: 0.8554
     ## Number of communities: 9
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.8519
+    ## Maximum modularity in 10 random starts: 0.8402
     ## Number of communities: 10
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.8389
-    ## Number of communities: 10
-    ## Elapsed time: 0 seconds
-    ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
-    ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
-    ## 
-    ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.8269
+    ## Maximum modularity in 10 random starts: 0.8272
     ## Number of communities: 11
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
     ## Maximum modularity in 10 random starts: 0.8152
@@ -252,21 +265,30 @@ SeuratObject <- FindClusters(SeuratObject, resolution = seq(from=0.1, to=1, by=0
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.8053
+    ## Maximum modularity in 10 random starts: 0.8032
     ## Number of communities: 12
     ## Elapsed time: 0 seconds
     ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
     ## 
-    ## Number of nodes: 2736
-    ## Number of edges: 95837
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
     ## 
     ## Running Louvain algorithm...
-    ## Maximum modularity in 10 random starts: 0.7950
+    ## Maximum modularity in 10 random starts: 0.7923
     ## Number of communities: 13
+    ## Elapsed time: 0 seconds
+    ## Modularity Optimizer version 1.3.0 by Ludo Waltman and Nees Jan van Eck
+    ## 
+    ## Number of nodes: 2403
+    ## Number of edges: 82017
+    ## 
+    ## Running Louvain algorithm...
+    ## Maximum modularity in 10 random starts: 0.7824
+    ## Number of communities: 15
     ## Elapsed time: 0 seconds
 
 ``` r
@@ -274,6 +296,8 @@ SeuratObject <- FindClusters(SeuratObject, resolution = seq(from=0.1, to=1, by=0
 SeuratObject$seurat_clusters <- SeuratObject$RNA_snn_res.0.5 
 Idents(SeuratObject) <- SeuratObject$RNA_snn_res.0.5 
 ```
+
+## Diagnostics of unsupervised clustering
 
 We will investigate how the selection of multiple resolutions affects
 the partition into individual cell
@@ -285,6 +309,34 @@ clustree(SeuratObject, prefix = "RNA_snn_res.")
 
 ![](1_initial_clustering_CK5_organoid_files/figure-gfm/clustree-1.png)<!-- -->
 
+We also checked whether mithochondrial expression drives the clustering
+
+``` r
+clustree(SeuratObject, prefix = "RNA_snn_res.", 
+     node_colour="percent.mt", node_colour_aggr="mean")
+```
+
+![](1_initial_clustering_CK5_organoid_files/figure-gfm/clustree_mt-1.png)<!-- -->
+
+``` r
+clustree(SeuratObject, prefix = "RNA_snn_res.", 
+     node_colour="nFeature_RNA", node_colour_aggr="median")
+```
+
+![](1_initial_clustering_CK5_organoid_files/figure-gfm/clustree_nFeat-1.png)<!-- -->
+
+``` r
+VlnPlot(SeuratObject, 
+    feature=c("percent.mt", "nFeature_RNA", 
+        "Dissociation", "G2M.Score"), 
+    pt.size=0.4,
+    ncol=2)
+```
+
+![](1_initial_clustering_CK5_organoid_files/figure-gfm/vln_badQual_mtNfeat-1.png)<!-- -->
+
+## Clustering decision
+
 We decided to chose resolution 0.5 for the initial clustering. We will
 save this output to archive the outcome. Herein, first column is the
 cell barcode, and rest of columns are clusters where each cell belong to
@@ -294,17 +346,14 @@ those related to resolution 0.5 (`RNA_snn_res.0.5` and
 
 ``` r
 # 1 Clustering outcome
-write.table(SeuratObject@meta.data[,c(grep("^RNA_snn_res",
-                                           colnames(SeuratObject@meta.data),
-                                           value=TRUE),
-                                      "seurat_clusters"),],
-            file=paste0(OUTDIR,"/init_clustering.tsv"),
-            sep="\t", col.names = NA, row.names=TRUE, quote=TRUE)
+saveClusteringOutcome(SeuratObject , assay="RNA", fl=paste0(OUTDIR,"/init_clustering.tsv"))
+```
 
+    ## [WARN] Selected metacols for Clustering outcome:RNA_snn_res.0.1,RNA_snn_res.0.2,RNA_snn_res.0.3,RNA_snn_res.0.4,RNA_snn_res.0.5,RNA_snn_res.0.6,RNA_snn_res.0.7,RNA_snn_res.0.8,RNA_snn_res.0.9,RNA_snn_res.1,seurat_clusters
+
+``` r
 # 2 Initial idents (same as seurat_clusters)
-write.table(data.frame("Ident"=SeuratObject@active.ident),
-            file=paste0(OUTDIR,"/active_idents.tsv"),
-            sep="\t", col.names = NA, row.names = TRUE, quote=TRUE)
+saveActiveIdents(SeuratObject, fl=paste0(OUTDIR,"/active_idents.tsv"))
 ```
 
 ## Non-linear dim reduction (umap)
@@ -317,26 +366,32 @@ SeuratObject <- RunUMAP(SeuratObject, dims = 1:25)
     ## To use Python UMAP via reticulate, set umap.method to 'umap-learn' and metric to 'correlation'
     ## This message will be shown once per session
 
-    ## 15:11:15 UMAP embedding parameters a = 0.9922 b = 1.112
+    ## 14:56:30 UMAP embedding parameters a = 0.9922 b = 1.112
 
-    ## 15:11:15 Read 2736 rows and found 25 numeric columns
+    ## 14:56:30 Read 2403 rows and found 25 numeric columns
 
-    ## 15:11:15 Using Annoy for neighbor search, n_neighbors = 30
+    ## 14:56:30 Using Annoy for neighbor search, n_neighbors = 30
 
-    ## 15:11:15 Building Annoy index with metric = cosine, n_trees = 50
+    ## 14:56:30 Building Annoy index with metric = cosine, n_trees = 50
 
     ## 0%   10   20   30   40   50   60   70   80   90   100%
 
     ## [----|----|----|----|----|----|----|----|----|----|
 
     ## **************************************************|
-    ## 15:11:16 Writing NN index file to temp file /tmp/RtmpKkEMZP/file61bb2e8fde1f
-    ## 15:11:16 Searching Annoy index using 1 thread, search_k = 3000
-    ## 15:11:16 Annoy recall = 100%
-    ## 15:11:17 Commencing smooth kNN distance calibration using 1 thread
-    ## 15:11:17 Initializing from normalized Laplacian + noise
-    ## 15:11:17 Commencing optimization for 500 epochs, with 111076 positive edges
-    ## 15:11:23 Optimization finished
+    ## 14:56:31 Writing NN index file to temp file /tmp/RtmpXkpO7H/file1c9d17a32fd3
+    ## 14:56:31 Searching Annoy index using 1 thread, search_k = 3000
+    ## 14:56:31 Annoy recall = 100%
+    ## 14:56:32 Commencing smooth kNN distance calibration using 1 thread
+    ## 14:56:32 Initializing from normalized Laplacian + noise
+    ## 14:56:32 Commencing optimization for 500 epochs, with 95292 positive edges
+    ## 14:56:38 Optimization finished
+
+``` r
+DimPlot(SeuratObject, reduction="umap") + ggtitle(Project(SeuratObject))
+```
+
+![](1_initial_clustering_CK5_organoid_files/figure-gfm/umap-1.png)<!-- -->
 
 ## Archive processed data for downstream analysis
 
@@ -376,7 +431,7 @@ sessionInfo()
     ## 
     ## other attached packages:
     ## [1] cowplot_1.0.0     clustree_0.4.1    ggraph_2.0.0.9000 ggplot2_3.2.1    
-    ## [5] Seurat_3.1.0     
+    ## [5] Seurat_3.1.0      rmarkdown_1.15    nvimcom_0.9-82   
     ## 
     ## loaded via a namespace (and not attached):
     ##   [1] tsne_0.1-3          nlme_3.1-141        bitops_1.0-6       
@@ -389,32 +444,32 @@ sessionInfo()
     ##  [22] labeling_0.3        checkmate_1.9.4     caTools_1.17.1.2   
     ##  [25] scales_1.0.0        lmtest_0.9-37       ggridges_0.5.1     
     ##  [28] pbapply_1.4-2       stringr_1.4.0       digest_0.6.21      
-    ##  [31] rmarkdown_1.15      R.utils_2.9.0       pkgconfig_2.0.3    
-    ##  [34] htmltools_0.3.6     bibtex_0.4.2        htmlwidgets_1.3    
-    ##  [37] rlang_0.4.0         farver_1.1.0        zoo_1.8-6          
-    ##  [40] jsonlite_1.6        ica_1.0-2           gtools_3.8.1       
-    ##  [43] dplyr_0.8.3         R.oo_1.22.0         magrittr_1.5       
-    ##  [46] Matrix_1.2-17       Rcpp_1.0.2          munsell_0.5.0      
-    ##  [49] viridis_0.5.1       ape_5.3             reticulate_1.13    
-    ##  [52] lifecycle_0.1.0     R.methodsS3_1.7.1   stringi_1.4.3      
-    ##  [55] yaml_2.2.0          gbRd_0.4-11         MASS_7.3-51.4      
-    ##  [58] gplots_3.0.1.1      Rtsne_0.15          plyr_1.8.4         
-    ##  [61] grid_3.6.1          parallel_3.6.1      gdata_2.18.0       
-    ##  [64] listenv_0.7.0       ggrepel_0.8.1       crayon_1.3.4       
-    ##  [67] lattice_0.20-38     graphlayouts_0.5.0  splines_3.6.1      
-    ##  [70] SDMTools_1.1-221.1  zeallot_0.1.0       knitr_1.24         
-    ##  [73] pillar_1.4.2        igraph_1.2.4.1      future.apply_1.3.0 
-    ##  [76] reshape2_1.4.3      codetools_0.2-16    leiden_0.3.1       
-    ##  [79] glue_1.3.1          evaluate_0.14       lsei_1.2-0         
-    ##  [82] metap_1.1           RcppParallel_4.4.3  data.table_1.12.2  
-    ##  [85] tweenr_1.0.1        vctrs_0.2.0         png_0.1-7          
-    ##  [88] Rdpack_0.11-0       polyclip_1.10-0     gtable_0.3.0       
-    ##  [91] RANN_2.6.1          purrr_0.3.2         tidyr_1.0.0        
-    ##  [94] future_1.14.0       assertthat_0.2.1    ggforce_0.3.1      
-    ##  [97] xfun_0.9            rsvd_1.0.2          tidygraph_1.1.2    
-    ## [100] RSpectra_0.15-0     survival_2.44-1.1   viridisLite_0.3.0  
-    ## [103] tibble_2.1.3        cluster_2.1.0       globals_0.12.4     
-    ## [106] fitdistrplus_1.0-14 ROCR_1.0-7
+    ##  [31] R.utils_2.9.0       pkgconfig_2.0.3     htmltools_0.3.6    
+    ##  [34] bibtex_0.4.2        htmlwidgets_1.3     rlang_0.4.0        
+    ##  [37] farver_1.1.0        zoo_1.8-6           jsonlite_1.6       
+    ##  [40] ica_1.0-2           gtools_3.8.1        dplyr_0.8.3        
+    ##  [43] R.oo_1.22.0         magrittr_1.5        Matrix_1.2-17      
+    ##  [46] Rcpp_1.0.2          munsell_0.5.0       viridis_0.5.1      
+    ##  [49] ape_5.3             reticulate_1.13     lifecycle_0.1.0    
+    ##  [52] R.methodsS3_1.7.1   stringi_1.4.3       yaml_2.2.0         
+    ##  [55] gbRd_0.4-11         MASS_7.3-51.4       gplots_3.0.1.1     
+    ##  [58] Rtsne_0.15          plyr_1.8.4          grid_3.6.1         
+    ##  [61] parallel_3.6.1      gdata_2.18.0        listenv_0.7.0      
+    ##  [64] ggrepel_0.8.1       crayon_1.3.4        lattice_0.20-38    
+    ##  [67] graphlayouts_0.5.0  splines_3.6.1       SDMTools_1.1-221.1 
+    ##  [70] zeallot_0.1.0       knitr_1.24          pillar_1.4.2       
+    ##  [73] igraph_1.2.4.1      future.apply_1.3.0  reshape2_1.4.3     
+    ##  [76] codetools_0.2-16    leiden_0.3.1        glue_1.3.1         
+    ##  [79] evaluate_0.14       lsei_1.2-0          metap_1.1          
+    ##  [82] RcppParallel_4.4.3  data.table_1.12.8   tweenr_1.0.1       
+    ##  [85] vctrs_0.2.0         png_0.1-7           Rdpack_0.11-0      
+    ##  [88] polyclip_1.10-0     gtable_0.3.0        RANN_2.6.1         
+    ##  [91] purrr_0.3.2         tidyr_1.0.0         future_1.14.0      
+    ##  [94] assertthat_0.2.1    ggforce_0.3.1       xfun_0.9           
+    ##  [97] rsvd_1.0.2          tidygraph_1.1.2     RSpectra_0.15-0    
+    ## [100] survival_2.44-1.1   viridisLite_0.3.0   tibble_2.1.3       
+    ## [103] cluster_2.1.0       globals_0.12.4      fitdistrplus_1.0-14
+    ## [106] ROCR_1.0-7
 
 ``` r
 {                                                                                                                                                                                                           

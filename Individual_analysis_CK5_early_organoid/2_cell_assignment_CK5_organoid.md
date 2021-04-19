@@ -1,6 +1,7 @@
 CK5 early organoid : cell assignment
 ================
-Javier Perales-Paton - <javier.perales@bioquant.uni-heidelberg.de>
+Javier Perales-Patón - <javier.perales@bioquant.uni-heidelberg.de> -
+ORCID: 0000-0003-0780-6683
 
 ## Load libraries and auxiliar functions
 
@@ -14,6 +15,7 @@ suppressPackageStartupMessages(require(genesorteR))
 suppressPackageStartupMessages(require(ComplexHeatmap))
 suppressPackageStartupMessages(require(clustree))
 suppressPackageStartupMessages(require(cowplot))
+suppressPackageStartupMessages(require(openxlsx))
 source("../src/seurat_fx.R")
 ```
 
@@ -44,16 +46,16 @@ a certain cell population.
 
 ``` r
 up <- setNames(vector("list",length=length(levels(SeuratObject))), 
-               levels(SeuratObject))
+                levels(SeuratObject))
 for(idx in names(up)) {
   up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
                         ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
   cols_names <- colnames(up.idx)
-  
+   
   # Add two extra cols
   up.idx$cluster <- idx
   up.idx$gene <- rownames(up.idx)
-  
+   
   up[[idx]] <- up.idx
 }
 ```
@@ -71,146 +73,137 @@ sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
     ## can also use a different binarization method. Excluded genes are available
     ## in the output under '$removed'.
 
-``` r
-#define a small set of markers
-#mm = getMarkers(sg, quant = 0.975)
-
-#cluster genes and make a heatmap
-#pp = plotMarkerHeat(sg$inputMat, sg$inputClass, mm$markers, clusterGenes=TRUE, outs = TRUE)
-
-#pp$gene_class_info #gene clusters
-
-#the top 25 genes for each cluster by specificity scores
-top_markers = apply(sg$specScore, 2, function(x) names(head(sort(x, decreasing = TRUE), n = 25)))
-```
-
 Finally we save the markers for manual exploration:
 
 ``` r
-MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
-if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
-
-# Wilcox
-for(idx in names(up)) {
-  write.table(up[[idx]][,c("cluster", "gene", cols_names)],
-              file = paste0(MARKERS_OUTDIR,"/cluster",idx,".tsv"),
-              sep="\t",col.names = TRUE, row.names = FALSE, quote=FALSE
-  )
-}
-saveRDS(up, file=paste0(MARKERS_OUTDIR,"/wilcox_up.rds"))
-
-# Genesorter
-saveRDS(sg, file=paste0(MARKERS_OUTDIR,"/genesorter_out.rds"))
-write.table(as.matrix(sg$specScore), paste0(MARKERS_OUTDIR,"/specScore.tsv"),
-            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
-
-write.table(as.matrix(sg$condGeneProb), paste0(MARKERS_OUTDIR,"/condGeneProb.tsv"),
-            sep="\t",row.names = TRUE,col.names = NA,quote=FALSE)
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+saveMarkers.CSV(up, OUTDIR)
+saveMarkers.CSV(sg, OUTDIR)
 ```
 
 ## Cell assignment
 
 We took a look at the markers from the different clusters from previous
-section. These can be found in the ./output/2\_cell\_assignment//Markers
+section. These can be found in the ./output/2\_cell\_assignment/
 directory.
 
 We took a look at the markes from previous section, making the following
 summary
 
-|  Cluster  |                                                             rational                                                              |
-| :-------: | :-------------------------------------------------------------------------------------------------------------------------------: |
-| Cluster 0 |                                 SLC34a2 high, SERPINE2+, EMP3+ proximal tubule AKAP12 25% PT like                                 |
-| Cluster 1 |                                35% SLC12a3, SLC14a2 5%, Distal Convoluted Tubule (DCT) AKAP12 25%                                 |
-| Cluster 2 |                                        AKAP12 68%, CDH6+, WNT7a+, CLDN7+, AKAP12 68% TPCs                                         |
-| Cluster 3 |                                     3% SLC12a1, SLC34a2 high, NCOA7+, LTF+ AKAP12 15% PT like                                     |
-| Cluster 4 |                                  NEAT1+, XIST+, MALAT1+, AKAP12 16% delete mito genes, looks odd                                  |
-| Cluster 5 | 25% SLC12a3 Distal Convoluted Tubule,Col4a3+, Col4a4+, SCN2a+ AGR3+, DEFB1+, SLC14a2 3%, Distal Convoluted Tubule (DCT) no AKAP12 |
-| Cluster 6 |                          MKI67+, , CENPF, CDKN3, BIRC5, CDC20, NUSAP1, AKAP12 30% proliferating PT-like                           |
-| Cluster 7 |                                     37% AQP1+, VCAM1 59%, AKAP12 60%, THBS2+, NUPR1+ PEC like                                     |
-| Cluster 8 |          no Pax8, CD133 (PROM1) 13%, no high spec score, ALDH1A3, AKAP12 11% (exclude high ribosomal probably garbadge)           |
-| Cluster 9 |                    CD133 0%, VCAM1 33%, THY1+, KRT23, SLIT3, CD13 (ANPEP), UPK3B, AKAP12 28%, EPCAM +PEC like                     |
+| Cluster |                                                             rational                                                              |
+| :-----: | :-------------------------------------------------------------------------------------------------------------------------------: |
+| Cluster |                                 SLC34a2 high, SERPINE2+, EMP3+ proximal tubule AKAP12 25% PT like                                 |
+| Cluster |                                35% SLC12a3, SLC14a2 5%, Distal Convoluted Tubule (DCT) AKAP12 25%                                 |
+| Cluster |                                        AKAP12 68%, CDH6+, WNT7a+, CLDN7+, AKAP12 68% TPCs                                         |
+| Cluster |                                     3% SLC12a1, SLC34a2 high, NCOA7+, LTF+ AKAP12 15% PT like                                     |
+| Cluster |                                  NEAT1+, XIST+, MALAT1+, AKAP12 16% delete mito genes, looks odd                                  |
+| Cluster | 25% SLC12a3 Distal Convoluted Tubule,Col4a3+, Col4a4+, SCN2a+ AGR3+, DEFB1+, SLC14a2 3%, Distal Convoluted Tubule (DCT) no AKAP12 |
+| Cluster |                          MKI67+, , CENPF, CDKN3, BIRC5, CDC20, NUSAP1, AKAP12 30% proliferating PT-like                           |
+| Cluster |                                     37% AQP1+, VCAM1 59%, AKAP12 60%, THBS2+, NUPR1+ PEC like                                     |
+| Cluster |          no Pax8, CD133 (PROM1) 13%, no high spec score, ALDH1A3, AKAP12 11% (exclude high ribosomal probably garbadge)           |
+| Cluster |                    CD133 0%, VCAM1 33%, THY1+, KRT23, SLIT3, CD13 (ANPEP), UPK3B, AKAP12 28%, EPCAM +PEC like                     |
 
 ``` r
-reporters <- list("PT-like"=c("SLC12A1", "SLC12A2", "NCOA7", "LTF",
-                              "SLC34A2", "SERPINE2", "EMP3", "AKAP12"),
-                  "DCT"=c("SLC12A3", "SLC14A2", "AKAP12",
-                          "COL4A3", "SCN2A", "AGR3", "DEFB1", "SLC14A2"),
-                  "TPC"=c("AKAP12", "CDH6", "WNT7A", "CLDN7"),
-                  "Prolif.PT-like"=c("MKI67", "CENPF", "CDKN3", "BIRC5", "CDC20",
-                                     "NUSAP1", "AKAP12"),
-                  "PEC-like"=c("AQP1", "VCAM1", "AKAP12", "THBS2", "NUPR1",
-                               "THY1", "KRT23","SLIT3", "ANPEP", "UPK3B"),
-                  "Others"=c("PAX8", "PROM1"))
-```
-
-``` r
-# condGeneProb from genesorteR
-Heatmap(as.matrix(sg$condGeneProb)[unlist(reporters),], name="condGeneProb",
-        col=c("white","red"),row_names_gp = gpar(fontsize=10),
-        cluster_rows = FALSE, cluster_columns = FALSE,
-        split = factor(unlist(sapply(names(reporters), function(z) rep(z,length(reporters[[z]])))),
-                       levels=names(reporters)),
-        row_title_rot = 0,row_gap = unit(0, "mm"),border=TRUE
-        )
-```
-
-![](2_cell_assignment_CK5_organoid_files/figure-gfm/cond_heatmap-1.png)<!-- -->
-
-``` r
-DoHeatmap2(SeuratObject, 
-           GS=GeneSetCollection(sapply(names(reporters), 
-                                       function(gs) GeneSet(unique(reporters[[gs]]), 
-                                                            setName=gs))),
-           assay = "RNA", res = 0.5
-           )
-```
-
-![](2_cell_assignment_CK5_organoid_files/figure-gfm/expr_heatmap-1.png)<!-- -->
-
-Expression of mitochondrial and ribosomal genes are going to discard
-cluster 4 and 8, respectively. Moreover, Cluster 8 has no PAX8
-expression (kidney marker), resulting in an aberrant cell population
-unexpected in this context (contaminant).
-
-``` r
-DoHeatmap2(SeuratObject, 
-           GS=GeneSetCollection(GeneSet(grep("^RPL",rownames(SeuratObject), value=TRUE), 
-                                        setName="Ribosomal"),
-                                GeneSet(grep("^MT-", rownames(SeuratObject), value=TRUE), 
-                                        setName="Mitochondrial")),
-           assay = "RNA", res = 0.5
-           )
-```
-
-![](2_cell_assignment_CK5_organoid_files/figure-gfm/excluding-1.png)<!-- -->
-
-``` r
-ren_id <- c("0"="PT-like_1",
-            "1"="DCT_1",
-            "2"="TPC",
-            "3"="PT-like_2",
-            "4"="Exclude_highmito",
-            "5"="DCT_2",
-            "6"="Proliferating_PT-like",
-            "7"="PEC-like_1",
-            "8"="Exclude_highribosomal",
-            "9"="PEC-like_2")
-```
-
-``` r
-SeuratObject <- RenameIdents(SeuratObject, ren_id)
-SeuratObject$init_assign <- Idents(SeuratObject)
-```
-
-## UMAP plot
-
-``` r
-DimPlot(SeuratObject, reduction = "umap", label=TRUE)
+FeaturePlot(SeuratObject, 
+        features=c("percent.mt", "nFeature_RNA", 
+               "S.Score", "G2M.Score"), 
+        label=TRUE, label.size=7)
 ```
 
     ## Warning: Using `as.character()` on a quosure is deprecated as of rlang 0.3.0.
     ## Please use `as_label()` or `as_name()` instead.
     ## This warning is displayed once per session.
+
+![](2_cell_assignment_CK5_organoid_files/figure-gfm/cellQual-1.png)<!-- -->
+
+``` r
+VlnPlot(SeuratObject, features=c("S.Score", "G2M.Score"))
+```
+
+![](2_cell_assignment_CK5_organoid_files/figure-gfm/CellCycle-1.png)<!-- -->
+
+``` r
+ren_id <- c("0"="TPC_1",
+            "1"="TPC_2",
+            "2"="DCT-like_1",
+            "3"="DCT-like_2",
+            "4"="TPC_3",
+            "5"="Prolif.TPC",
+            "6"="PEC-like_1",
+            "7"="Epith.:HighRibo",
+            "8"="PEC-like_2",
+            "9"="Epith.:HighMT")
+```
+
+``` r
+stopifnot(all(names(ren_id) %in% levels(SeuratObject)))
+stopifnot(length(ren_id) == length(levels(SeuratObject)))
+
+SeuratObject <- RenameIdents(SeuratObject, ren_id)
+SeuratObject$init_assign <- factor(as.character(Idents(SeuratObject)))
+
+colnames(sg$condGeneProb) <- ren_id[colnames(sg$condGeneProb)]
+colnames(sg$specScore) <- ren_id[colnames(sg$specScore)]
+```
+
+``` r
+AdultOrganoid <- getGmt("../data/Prior/adultorganoid_markers.gmt")
+AdultOrganoid <- GeneSetCollection(lapply(AdultOrganoid, function(GS) {
+              GS@geneIds <- intersect(GS@geneIds, rownames(SeuratObject))
+              return(GS)
+        }))
+AdultOrganoid <- AdultOrganoid[unlist(lapply(geneIds(AdultOrganoid), length)) > 0]
+```
+
+``` r
+DoMultiHeatmap(SeuratObject, sg, GSC = AdultOrganoid, assay = "RNA", show_plot = TRUE)
+```
+
+![](2_cell_assignment_CK5_organoid_files/figure-gfm/AdultOrganoid_mhp-1.png)<!-- -->
+
+    ## NULL
+
+``` r
+DoMultiDotPlot(SeuratObject, sg, GSC = AdultOrganoid)
+```
+
+    ## Scale for 'size' is already present. Adding another scale for 'size',
+    ## which will replace the existing scale.
+
+![](2_cell_assignment_CK5_organoid_files/figure-gfm/AdultOrganoid_dplot-1.png)<!-- -->
+
+``` r
+DoClustReport(SeuratObject, sg, AdultOrganoid, show_NCells=TRUE)
+```
+
+    ## Scale for 'size' is already present. Adding another scale for 'size',
+    ## which will replace the existing scale.
+
+    ## Loading required package: gridExtra
+
+    ## 
+    ## Attaching package: 'gridExtra'
+
+    ## The following object is masked from 'package:dplyr':
+    ## 
+    ##     combine
+
+    ## The following object is masked from 'package:Biobase':
+    ## 
+    ##     combine
+
+    ## The following object is masked from 'package:BiocGenerics':
+    ## 
+    ##     combine
+
+![](2_cell_assignment_CK5_organoid_files/figure-gfm/ClustReport-1.png)<!-- -->
+
+## UMAP plot
+
+``` r
+DimPlot(SeuratObject, reduction = "umap", label=TRUE) +
+    coord_cartesian(clip = "off")
+```
 
 ![](2_cell_assignment_CK5_organoid_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
@@ -230,6 +223,11 @@ if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
 
 ``` r
 saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+saveRDS(up, file=paste0(OUTDIR,"/wilcox_up.rds"))
+saveRDS(sg, file=paste0(OUTDIR,"/genesorter_out.rds"))
+
+# After Rename Idents
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
 ```
 
 ## Session info
@@ -259,53 +257,55 @@ sessionInfo()
     ##  [8] datasets  methods   base     
     ## 
     ## other attached packages:
-    ##  [1] cowplot_1.0.0        clustree_0.4.1       ggraph_2.0.0.9000   
-    ##  [4] ComplexHeatmap_2.0.0 genesorteR_0.3.1     Matrix_1.2-17       
-    ##  [7] dplyr_0.8.3          GSEABase_1.46.0      graph_1.62.0        
-    ## [10] annotate_1.62.0      XML_3.98-1.20        AnnotationDbi_1.46.1
-    ## [13] IRanges_2.18.2       S4Vectors_0.22.1     Biobase_2.44.0      
-    ## [16] BiocGenerics_0.30.0  ggplot2_3.2.1        Seurat_3.1.0        
+    ##  [1] gridExtra_2.3        openxlsx_4.2.3       cowplot_1.0.0       
+    ##  [4] clustree_0.4.1       ggraph_2.0.0.9000    ComplexHeatmap_2.0.0
+    ##  [7] genesorteR_0.3.1     Matrix_1.2-17        dplyr_0.8.3         
+    ## [10] GSEABase_1.46.0      graph_1.62.0         annotate_1.62.0     
+    ## [13] XML_3.98-1.20        AnnotationDbi_1.46.1 IRanges_2.18.2      
+    ## [16] S4Vectors_0.22.1     Biobase_2.44.0       BiocGenerics_0.30.0 
+    ## [19] ggplot2_3.2.1        Seurat_3.1.0         rmarkdown_1.15      
+    ## [22] nvimcom_0.9-82      
     ## 
     ## loaded via a namespace (and not attached):
-    ##   [1] Rtsne_0.15          colorspace_1.4-1    rjson_0.2.20       
-    ##   [4] ggridges_0.5.1      mclust_5.4.5        circlize_0.4.7     
-    ##   [7] GlobalOptions_0.1.0 clue_0.3-57         farver_1.1.0       
-    ##  [10] leiden_0.3.1        listenv_0.7.0       npsurv_0.4-0       
-    ##  [13] graphlayouts_0.5.0  ggrepel_0.8.1       bit64_0.9-7        
-    ##  [16] codetools_0.2-16    splines_3.6.1       R.methodsS3_1.7.1  
-    ##  [19] lsei_1.2-0          knitr_1.24          polyclip_1.10-0    
-    ##  [22] zeallot_0.1.0       jsonlite_1.6        ica_1.0-2          
-    ##  [25] cluster_2.1.0       png_0.1-7           R.oo_1.22.0        
-    ##  [28] pheatmap_1.0.12     uwot_0.1.4          ggforce_0.3.1      
-    ##  [31] sctransform_0.2.0   compiler_3.6.1      httr_1.4.1         
-    ##  [34] backports_1.1.4     assertthat_0.2.1    lazyeval_0.2.2     
-    ##  [37] tweenr_1.0.1        htmltools_0.3.6     tools_3.6.1        
-    ##  [40] rsvd_1.0.2          igraph_1.2.4.1      gtable_0.3.0       
-    ##  [43] glue_1.3.1          RANN_2.6.1          reshape2_1.4.3     
-    ##  [46] Rcpp_1.0.2          vctrs_0.2.0         gdata_2.18.0       
-    ##  [49] ape_5.3             nlme_3.1-141        gbRd_0.4-11        
-    ##  [52] lmtest_0.9-37       xfun_0.9            stringr_1.4.0      
-    ##  [55] globals_0.12.4      lifecycle_0.1.0     irlba_2.3.3        
-    ##  [58] gtools_3.8.1        future_1.14.0       MASS_7.3-51.4      
-    ##  [61] zoo_1.8-6           scales_1.0.0        tidygraph_1.1.2    
-    ##  [64] RColorBrewer_1.1-2  yaml_2.2.0          memoise_1.1.0      
-    ##  [67] reticulate_1.13     pbapply_1.4-2       gridExtra_2.3      
-    ##  [70] stringi_1.4.3       RSQLite_2.1.2       caTools_1.17.1.2   
-    ##  [73] bibtex_0.4.2        shape_1.4.4         Rdpack_0.11-0      
-    ##  [76] SDMTools_1.1-221.1  rlang_0.4.0         pkgconfig_2.0.3    
-    ##  [79] bitops_1.0-6        evaluate_0.14       lattice_0.20-38    
-    ##  [82] ROCR_1.0-7          purrr_0.3.2         labeling_0.3       
-    ##  [85] htmlwidgets_1.3     bit_1.1-14          tidyselect_0.2.5   
-    ##  [88] RcppAnnoy_0.0.13    plyr_1.8.4          magrittr_1.5       
-    ##  [91] R6_2.4.0            gplots_3.0.1.1      DBI_1.0.0          
-    ##  [94] pillar_1.4.2        withr_2.1.2         fitdistrplus_1.0-14
-    ##  [97] survival_2.44-1.1   RCurl_1.95-4.12     tibble_2.1.3       
-    ## [100] future.apply_1.3.0  tsne_0.1-3          crayon_1.3.4       
-    ## [103] KernSmooth_2.23-16  plotly_4.9.0        rmarkdown_1.15     
-    ## [106] viridis_0.5.1       GetoptLong_0.1.7    data.table_1.12.2  
-    ## [109] blob_1.2.0          metap_1.1           digest_0.6.21      
-    ## [112] xtable_1.8-4        tidyr_1.0.0         R.utils_2.9.0      
-    ## [115] RcppParallel_4.4.3  munsell_0.5.0       viridisLite_0.3.0
+    ##   [1] backports_1.1.4     circlize_0.4.7      plyr_1.8.4         
+    ##   [4] igraph_1.2.4.1      lazyeval_0.2.2      splines_3.6.1      
+    ##   [7] listenv_0.7.0       digest_0.6.21       htmltools_0.3.6    
+    ##  [10] viridis_0.5.1       gdata_2.18.0        magrittr_1.5       
+    ##  [13] memoise_1.1.0       cluster_2.1.0       ROCR_1.0-7         
+    ##  [16] globals_0.12.4      graphlayouts_0.5.0  RcppParallel_4.4.3 
+    ##  [19] R.utils_2.9.0       colorspace_1.4-1    blob_1.2.0         
+    ##  [22] ggrepel_0.8.1       xfun_0.9            crayon_1.3.4       
+    ##  [25] RCurl_1.95-4.12     jsonlite_1.6        zeallot_0.1.0      
+    ##  [28] survival_2.44-1.1   zoo_1.8-6           ape_5.3            
+    ##  [31] glue_1.3.1          polyclip_1.10-0     gtable_0.3.0       
+    ##  [34] leiden_0.3.1        GetoptLong_0.1.7    future.apply_1.3.0 
+    ##  [37] shape_1.4.4         scales_1.0.0        pheatmap_1.0.12    
+    ##  [40] DBI_1.0.0           bibtex_0.4.2        Rcpp_1.0.2         
+    ##  [43] metap_1.1           viridisLite_0.3.0   xtable_1.8-4       
+    ##  [46] clue_0.3-57         reticulate_1.13     bit_1.1-14         
+    ##  [49] rsvd_1.0.2          mclust_5.4.5        SDMTools_1.1-221.1 
+    ##  [52] tsne_0.1-3          htmlwidgets_1.3     httr_1.4.1         
+    ##  [55] gplots_3.0.1.1      RColorBrewer_1.1-2  ica_1.0-2          
+    ##  [58] pkgconfig_2.0.3     R.methodsS3_1.7.1   farver_1.1.0       
+    ##  [61] uwot_0.1.4          labeling_0.3        tidyselect_0.2.5   
+    ##  [64] rlang_0.4.0         reshape2_1.4.3      munsell_0.5.0      
+    ##  [67] tools_3.6.1         RSQLite_2.1.2       ggridges_0.5.1     
+    ##  [70] evaluate_0.14       stringr_1.4.0       yaml_2.2.0         
+    ##  [73] npsurv_0.4-0        knitr_1.24          bit64_0.9-7        
+    ##  [76] fitdistrplus_1.0-14 tidygraph_1.1.2     zip_2.1.1          
+    ##  [79] caTools_1.17.1.2    purrr_0.3.2         RANN_2.6.1         
+    ##  [82] pbapply_1.4-2       future_1.14.0       nlme_3.1-141       
+    ##  [85] R.oo_1.22.0         compiler_3.6.1      plotly_4.9.0       
+    ##  [88] png_0.1-7           lsei_1.2-0          tibble_2.1.3       
+    ##  [91] tweenr_1.0.1        stringi_1.4.3       lattice_0.20-38    
+    ##  [94] vctrs_0.2.0         pillar_1.4.2        lifecycle_0.1.0    
+    ##  [97] Rdpack_0.11-0       lmtest_0.9-37       GlobalOptions_0.1.0
+    ## [100] RcppAnnoy_0.0.13    data.table_1.12.8   bitops_1.0-6       
+    ## [103] irlba_2.3.3         gbRd_0.4-11         R6_2.4.0           
+    ## [106] KernSmooth_2.23-16  codetools_0.2-16    MASS_7.3-51.4      
+    ## [109] gtools_3.8.1        assertthat_0.2.1    rjson_0.2.20       
+    ## [112] withr_2.1.2         sctransform_0.2.0   tidyr_1.0.0        
+    ## [115] Rtsne_0.15          ggforce_0.3.1
 
 ``` r
 {                                                                                                                                                                                                           
