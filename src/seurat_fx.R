@@ -3,6 +3,7 @@
 ### DESCRIPTION : These functions are pretty similar to those used in the tutorial
 ###       but just a wrapper to facilitate readibility of the scripts.
 
+
 # Get a SeuratObject from 10x data
 # Also calculates the percentage of mitocondrial genes
 getSeuratObject <- function(path, project_name, min.cells=3, min.features=200, mt.pattern="^MT-") {
@@ -74,11 +75,62 @@ PlotModuleScore <- function(SeuratObject, genes, reduction="tsne", tag=NULL) {
   
 }
 
+#' Save a active Idents from SeuratObject
+#'
+#' @param SeuratObject a seurat object
+#' @param fl a path to a file
+saveActiveIdents <- function(SeuratObject, fl) {
+	if(grepl("\\.csv$", fl)) {
+		sepx <- ","
+	} else if (grepl("\\.tsv$", fl)) {
+		sepx <- "\t"
+	} else {
+		stop("[ERROR] : file extension not supported\n")
+	}
+
+	write.table(data.frame("Ident"=SeuratObject@active.ident),
+		    file=fl,
+		    sep=sepx, col.names = NA, 
+		    row.names = TRUE, quote=TRUE)
+}
+
+#' Save a active Idents from SeuratObject
+#'
+#' @param SeuratObject a seurat object
+#' @param assay the name of assay
+#' @param fl a path to a file
+saveClusteringOutcome <- function(SeuratObject, assay="RNA", fl) {
+
+	if(grepl("\\.csv$", fl)) {
+		sepx <- ","
+	} else if (grepl("\\.tsv$", fl)) {
+		sepx <- "\t"
+	} else {
+		stop("[ERROR] : file extension not supported\n")
+	}
+
+	meta_idx <- grep(paste0("^(",assay,"_snn_res\\.|",
+				"seurat_clusters)"),
+                        colnames(SeuratObject@meta.data),
+                        value=TRUE)
+
+	stopifnot(length(meta_idx)>0)
+	cat(paste0("[WARN] Selected metacols for Clustering outcome:",
+		   paste(meta_idx, collapse=","), "\n"), file=stdout())
+
+	tab <- SeuratObject@meta.data[, meta_idx, drop=FALSE]
+	write.table(tab,
+		    file=fl,
+		    sep=sepx, col.names = NA, 
+		    row.names = TRUE, quote=TRUE)
+}
+
+
 # Enhanced DoHeatmap function
 DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, 
                        show_hr=TRUE, cols=NULL, width =NULL,name="Expr.",
                        row_names_fontisze=12,
-                       legend.dir="horizontal") {
+                       legend.dir="vertical") {
   library(ComplexHeatmap)
   
   gg_color_hue <- function(n) {
@@ -96,17 +148,22 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
   genes.cols <- unlist(sapply(names(GSC), function(abbn) rep(abbn, length(geneIds(GSC)[[abbn]]))))
   genes.cols <- gsub("__","\n",genes.cols)
   
-  if(all(dim(SeuratObject@assays$RNA@scale.data) == c(0,0))) {
-    SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
-  }
-  mat <- SeuratObject@assays[[assay]]@scale.data
-  
-  if(is.null(res)) {
-    cl <- as.character(Idents(SeuratObject))
-    cl_num <- FALSE
+  if(is(SeuratObject)[1]=="Seurat") {
+	  if(all(dim(SeuratObject@assays$RNA@scale.data) == c(0,0))) {
+		  SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
+	  }
+	  mat <- SeuratObject@assays[[assay]]@scale.data
+
+	  if(is.null(res)) {
+		  cl <- as.character(Idents(SeuratObject))
+		  cl_num <- FALSE
+	  } else {
+		  cl <- as.character(SeuratObject@meta.data[,paste0(assay,"_snn_res.",res)]) 
+		  cl_num <- TRUE
+	  }
   } else {
-    cl <- as.character(SeuratObject@meta.data[,paste0(assay,"_snn_res.",res)]) 
-    cl_num <- TRUE
+	  stop("ERROR: Input is not a SeuratObject\n")
+
   }
   
   # Reorder
@@ -150,8 +207,6 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
                           annotation_legend_param= list(legend_height = unit(8, "cm"),
                                                         grid_width = unit(5, "mm"),
                                                         title_gp=gpar(fontsize=16),
-                                                        # at=c(-2.5,-2,-1,0,1,2,2.5),
-                                                        # labels = c("","-2","-1","0","1","2",""),
                                                         labels_gp = gpar(fontsize = 14)))
   
   hr <- rowAnnotation(df=data.frame("type"=hr_classes), show_annotation_name = FALSE,
@@ -160,9 +215,7 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
                       annotation_legend_param= list(legend_height = unit(4, "cm"),
                                                     grid_height = unit(10, "mm"),
                                                     title_gp=gpar(fontsize=16),
-                                                    direction = legend.dir, ncol=4,
-                                                    # at=c(-2.5,-2,-1,0,1,2,2.5),
-                                                    # labels = c("","-2","-1","0","1","2",""),
+                                                     direction = legend.dir, # ncol=4,
                                                     labels_gp = gpar(fontsize = 22)))
   
   f1 <-  circlize::colorRamp2(c(-2,0,+2), c("purple", "black", "yellow"))
@@ -170,13 +223,14 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
                 name=name,
 		use_raster=FALSE,
                 top_annotation = hc, 
-#  		bottom_annotation = hc,
-                # split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(0, "mm"), 
+  		bottom_annotation = hc,
+                split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(2, "mm"), 
                 column_split = factor(cl, levels=unique(cl)), column_title_rot=ifelse(cl_num,0,90), column_gap = unit(0, "mm"),
                 # left_annotation = rowAnnotation(foo=anno_block(gpar(fill=table(genes.cols)[unique(genes.cols)]),
                 #                                                labels=unique(genes.cols),
                 #                                                labels_gp=gpar(col="white",fontsize=10))),
                 width=width,
+		border=TRUE,
                 heatmap_legend_param= list(legend_height = unit(4, "cm"),
                                            title_gp=gpar(fontsize=16),
                                            direction=legend.dir,
@@ -193,6 +247,329 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
   return(hh)
 }
 
+GsHeatmap <- function(sg, 
+		      feature="specScore", maxcol="green4", 
+		      GSC, cl, cl_num, legend.dir="vertical",
+		      row_names_fontisze=12
+		      ) {
+
+
+	gg_color_hue <- function(n) {
+		hues = seq(15, 375, length = n + 1)
+		hcl(h = hues, l = 65, c = 100)[1:n]
+	}
+
+	gg_color_hue2 <- function(n) {
+		hues = seq(15, 375, length = n + 1)
+		hcl(h = hues, l = 35, c = 100)[1:n]
+	}
+
+
+  	genes <- unlist(geneIds(GSC))
+	genes.cols <- unlist(sapply(names(GSC), function(abbn) rep(abbn, length(geneIds(GSC)[[abbn]]))))
+  	genes.cols <- gsub("__","\n",genes.cols)
+  
+  	hr_classes <- genes.cols
+
+	gene_list <- geneIds(GSC)
+
+	# Reorder
+	if(cl_num) {
+		ord <- order(as.numeric(cl), decreasing = FALSE)
+	} else {
+		ord <- order(as.character(cl), decreasing = FALSE)
+	}
+	mat <- as.matrix(sg[[feature]])[unlist(gene_list), ord]
+	cl <- cl[ord]
+
+    	cl.cols <- gg_color_hue(length(unique(cl)))
+	if(cl_num) {
+		names(cl.cols) <- unique(as.character(sort(as.numeric(cl))))
+	} else {
+		names(cl.cols) <- unique(as.character(sort(cl)))
+	} 
+
+
+	hc <- HeatmapAnnotation(df=data.frame("cluster"=cl),
+				col = list("cluster"=cl.cols), show_annotation_name = FALSE,
+                          show_legend = FALSE,
+			  height=unit(2, "mm"),
+                          annotation_legend_param= list(legend_height = unit(8, "cm"),
+                                                        grid_width = unit(5, "mm"),
+                                                        title_gp=gpar(fontsize=16),
+                                                        labels_gp = gpar(fontsize = 14)))
+ 
+	hr <- rowAnnotation(df=data.frame("type"=hr_classes), show_annotation_name = FALSE,
+                      col=list("type"=setNames(gg_color_hue2(length(unique(hr_classes))),
+                                               unique(hr_classes))),
+                      annotation_legend_param= list(legend_height = unit(4, "cm"),
+                                                    grid_height = unit(10, "mm"),
+                                                    title_gp=gpar(fontsize=16),
+                                                     direction = legend.dir, # ncol=4,
+                                                    labels_gp = gpar(fontsize = 22)))
+
+	hp <- Heatmap(mat, name=feature,
+		col=c("white",maxcol),row_names_gp = gpar(fontsize=10),
+		column_names_side = "top",
+                top_annotation = hc, 
+  		bottom_annotation = hc,
+		cluster_rows = FALSE, cluster_columns = FALSE,
+		width=unit(6, "cm"),
+		split = factor(unlist(sapply(names(gene_list), function(z) rep(z,length(gene_list[[z]])))),
+                       levels=names(gene_list)),
+                column_split = factor(cl, levels=unique(cl)), column_title_rot=ifelse(cl_num,0,90), column_gap = unit(0, "mm"),
+		show_column_names = FALSE,
+        row_title_rot = 0,row_gap = unit(2, "mm"),border=TRUE
+        )
+
+	return(hp)
+}
+
+
+#' DoMultiHeatmap multi-heatmap for marker confirmation
+#' 
+#' @param SeuratObject A seurat object with set Idents, scaled data slot with gene expression
+#' @param sg a list output from genesorteR with sparse matrices condGeneProb and specScore
+#' @param GSC A GeneSetCollection from GSEABase library
+#' @param assay assay slot to take from gene expression
+#' @param show_plot whether to show the heatmaps or not 
+DoMultiHeatmap <- function(SeuratObject, sg, GSC, assay="RNA", show_plot=TRUE) {
+	# Row-Scaled Heatmap expression
+	hp1 <- DoHeatmap2(SeuratObject, 
+			  GS=GSC, show_hr=FALSE,
+			  width=unit(16, "cm"),
+			  assay = assay, res = NULL, 
+			  )
+	# Absolute Heatmap of condGeneProb from genesorteR
+	hp2 <- GsHeatmap(sg, feature = "condGeneProb", maxcol = "red",
+			 GSC = GSC, cl = levels(SeuratObject), cl_num = FALSE)
+
+	# Absolute Heatmap of condGeneProb from genesorteR
+	hp3 <- GsHeatmap(sg, feature = "specScore", maxcol = "green4",
+			 GSC = GSC, cl = levels(SeuratObject), cl_num = FALSE)
+
+	# Buildup the list of heatmaps
+	ht_list <- hp1 + hp2 + hp3
+
+	if(show_plot) {	
+		draw(ht_list, column_title=Project(SeuratObject), 
+		     column_title_gp = gpar(fontsize = 30))
+		return(NULL)
+	} else {
+		return(ht_list)
+	}
+}
+
+#' Dotplot2 adaptation of Seurat::DotPlot for gene sets
+#'
+#' @param SeuratObject a seurat object
+#' @param GSC a GeneSetCollection as defined by GSEABase library
+#' @param assay the assay to be defined in the dotplot
+#' @param res resolution parameter encoded to set clusters
+DotPlot2 <- function(SeuratObject, GSC, assay="RNA", res=NULL) {
+ 	
+	# Extract genes
+  	genes <- unlist(geneIds(GSC))
+	gene_list <- geneIds(GSC)
+	if(is(SeuratObject)[1]=="Seurat") {
+	  if(all(dim(SeuratObject@assays$RNA@scale.data) == c(0,0))) {
+		  SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
+	  }
+	  if(is.null(res)) {
+		  cl <- as.character(levels(SeuratObject))
+		  cl_num <- FALSE
+	  } else {
+		  cl <- as.character(levels(SeuratObject@meta.data[,paste0(assay,"_snn_res.",res)]))
+		  cl_num <- TRUE
+	  }
+	 } else {
+	  stop("ERROR: Input is not a SeuratObject\n")
+	}
+  
+
+	# Reorder of clusters
+	if(cl_num) {
+		ord <- order(as.numeric(cl), decreasing = FALSE)
+	} else {
+		ord <- order(as.character(cl), decreasing = FALSE)
+	}
+
+# Cluster order
+	Idents(SeuratObject) <- factor(Idents(SeuratObject), levels=levels(SeuratObject)[ord])
+
+	yfeatures <- data.frame("gene"=unlist(gene_list),
+				"geneset"=unlist(sapply(names(gene_list), function(z) rep(z, length(gene_list[[z]]))))
+				)
+	yfeatures$geneset <- factor(yfeatures$geneset, levels=rev(names(GSC)))
+	yfeatures <- yfeatures[order(yfeatures$geneset),]
+	col_pairs <- setNames(as.integer(factor(yfeatures$geneset)),
+			      yfeatures$gene)
+
+
+	gg <- DotPlot(SeuratObject, features=genes) + 
+ 		scale_y_discrete(position="right") + 
+ 		scale_x_discrete(position="bottom") + 
+		coord_flip(clip="off") + 
+ 		scale_size(limits=c(0,100), breaks=seq(0,100,25)) +
+		guides(colour=guide_colourbar(title = "Scaled Average Expression",
+					      title.position="top", title.hjust=0.5, 
+					      barwidth=10),
+		       size = guide_legend(title = "Percent Expressed",
+					   title.position="top", title.hjust=0.5, 
+					   order=2)) +
+		theme(axis.title = element_blank(),
+# 		      axis.ticks.y = element_line(size=7, colour=col_pairs),
+		      axis.text.x = element_text(angle = 45, hjust=0),
+		      legend.position="bottom",
+# 		      legend.box="vertical",
+		      plot.margin = unit(c(2,3,1,10), "lines"))
+
+	yinit <- 0
+	for(ann in levels(yfeatures$geneset)) {
+		cnt <- sum(yfeatures$geneset==ann)
+		ycoord <- mean(c(yinit, yinit + cnt))+0.5
+		yinit <- yinit + cnt
+		gg <- gg + annotation_custom(grob=textGrob(label=ann, 
+							   hjust=1, 
+							   gp=gpar(cex=1.5)), 
+			       xmin = ycoord, xmax=ycoord,
+			       ymin=-1.5, ymax=-1.5)
+		if(ann != levels(yfeatures$geneset)[length(levels(yfeatures$geneset))]) {
+			gg <- gg + geom_vline(xintercept=yinit+0.5, 
+					      alpha = 0.7, colour= "black") # color=col_pairs[yinit])
+		}
+	}
+	return(gg)
+
+}
+ 
+
+#' GsDotPlot dotplot for genesoteR ouput grouped by gene sets
+#'
+#' @param sg a list output from genesoteR with sparse matrices condGeneProb and specScore
+#' @param GSC A GeneSetCollection from GSEABase library
+#' @param cl clusters identities
+#' @param cl_num whether cl is numeric or character
+GsDotPlot <- function(sg, GSC, cl, cl_num) {
+
+	# Unfortunately we have to revert both gene sets and order of collection to keep
+	# them in the right order as in the gene set since ggplot2 reverse the order of
+	# y axis when factors
+	GSC <- GeneSetCollection(lapply(GSC, function(GS) {
+			      GS@geneIds <- rev(GS@geneIds)
+			      return(GS)
+	    }))
+	GSC <- GSC[rev(names(GSC))]
+	
+  	genes <- unlist(geneIds(GSC))
+	gene_list <- geneIds(GSC)
+	# Reorder
+	if(cl_num) {
+		ord <- order(as.numeric(cl), decreasing = FALSE)
+	} else {
+		ord <- order(as.character(cl), decreasing = FALSE)
+	}
+	# Cluster order
+	cl <- cl[ord]
+
+	# condGeneProb
+	cGP <- reshape2::melt(as.matrix(sg[["condGeneProb"]])[unlist(gene_list), ord])
+	colnames(cGP) <- c("gene", "cluster", "condGeneProb")
+	cGP$cluster <- factor(as.character(cGP$cluster), levels=cl)
+
+	# specScore
+	sS <- reshape2::melt(as.matrix(sg[["specScore"]])[unlist(gene_list), ord])
+	colnames(sS) <- c("gene", "cluster", "specScore")
+	sS$cluster <- factor(as.character(sS$cluster), levels=cl)
+
+ 	stopifnot(all(cGP$cluster==sS$cluster))
+	stopifnot(all(cGP$gene==sS$gene))
+	dat <- cGP
+	dat$specScore <- sS$specScore
+	rm(cGP, sS)
+	dat$geneset <- sapply(as.character(dat$gene), function(gene) {
+			idx <- unlist(lapply(geneIds(GSC), function(gs) any(gene%in%gs)))
+			res <- paste0(names(GSC)[idx],collapse=",")
+			return(res)
+		      })
+	dat$geneset <- factor(dat$geneset, levels=names(GSC))
+
+	yfeatures <- unique(dat[, c("gene", "geneset")])
+	col_pairs <- setNames(as.integer(factor(yfeatures$geneset)),
+			      yfeatures$gene)
+
+	gg <- ggplot(dat, aes(x=cluster, y=gene, size=condGeneProb, color=specScore)) +
+		geom_point() + theme_cowplot() +
+		scale_color_gradientn(colours= c("lightgrey","lightgreen","red"),
+				      values= c(0, 0.05, 0.25, 0.35, 1)) + 
+#  		scale_color_gradientn(colours= c("lightgrey","blue"),
+#  				      values= c(0, 0.05, 0.35, 1)) + 
+ 		scale_size(limits=c(0,1), breaks=seq(0,1,0.25)) +
+		scale_x_discrete(position="top") + 
+		coord_cartesian(clip="off") + 
+		guides(colour=guide_colourbar(title="Specificity Score",
+					      title.position="top", title.hjust=0.5, barwidth=10),
+		       size = guide_legend(title="Conditional Gene Probability",
+					   title.position="top", title.hjust=0.5, order=2)) +
+		theme(axis.title = element_blank(),
+# 		      axis.ticks.y = element_line(size=7,colour=col_pairs),
+		      axis.text.x = element_text(angle = 45, hjust=0),
+		      legend.position="bottom",
+# 		      legend.box="vertical",
+		      plot.margin = unit(c(2,3,1,10), "lines"))
+
+	yinit <- 0
+	for(ann in levels(yfeatures$geneset)) {
+		cnt <- sum(yfeatures$geneset==ann)
+		ycoord <- mean(c(yinit, yinit + cnt))+0.5
+		yinit <- yinit + cnt
+		gg <- gg + annotation_custom(grob=textGrob(label=ann, 
+							   hjust=1, 
+							   gp=gpar(cex=1.5)), 
+			       ymin = ycoord, ymax=ycoord,
+			       xmin=-1.5, xmax=-1.5)
+		if(ann != levels(yfeatures$geneset)[length(levels(yfeatures$geneset))]) {
+			gg <- gg + geom_hline(yintercept=yinit+0.5, 
+					      alpha = 0.7, colour= "black") # color=col_pairs[yinit])
+		}
+	}
+
+	return(gg)
+}
+
+#' DoMultiDotPlot for expression and genesorter
+#'
+#' @param SeuratObject a seurat object with idents active
+#' @param sg a list from genesorter output
+#' @param GSC a gene set collection with marker genes per set
+#' @param assay name of assay for expression in the seurat object
+#' @param show_NCells boolean whether to show a table with Ncells per cluster
+DoMultiDotPlot <- function(SeuratObject, sg, GSC, assay="RNA", show_NCells=FALSE) {
+	require(ggplot2)
+
+	#NOTE: implement different resolution than null
+	res <- NULL
+	plot1 <- DotPlot2(SeuratObject, GSC=GSC, assay="RNA", res=NULL) 
+	plot2 <- GsDotPlot(sg, GSC = GSC, cl = levels(SeuratObject), cl_num = FALSE)
+
+	title <- ggdraw() +
+		draw_label(Project(SeuratObject), 
+			   fontface="bold", size=22, x=0.5, vjust=0.5, hjust=0) +
+		theme(plot.margin=unit(c(0, 0, 0, 4), "mm"))
+	if(show_NCells) {
+		require(gridExtra)
+		cnt <- table(Idents(SeuratObject))
+		cnt <- unclass(cnt)
+		cnt <- cnt[sort(names(cnt))]
+		cnt <- as.matrix(cnt)
+		title <- title + annotation_custom(tableGrob(t(cnt)), ymin=-0.8, ymax=1)
+	}
+
+	plot_row <- plot_grid(plot1, plot2)
+	plot_res <- plot_grid(title, plot_row, ncol=1, rel_heights=c(0.1,1))
+
+	return(plot_res)
+}
 
 ## DotPlot function to visualize across samples the average expression and percentage
 ## of cells per cluster from a set of samples. In contrast to default Seurat function,
@@ -311,6 +688,34 @@ DotPlot_panel <- function (object=SeuratObject, assay = NULL, features,
   
   return(plots)
 }
+
+#' DoClustReport make a report of clusters
+#' 
+#' @param SeuratObject
+#' @param sg Output list from GeneSorteR
+#' @param GSC a GeneSetCollection class from GSEABase
+#' @param show_NCells whether show Ncells per cluster
+DoClustReport <- function(SeuratObject, sg, GSC, show_NCells = TRUE) {
+	QC_feats <- c("percent.mt", "nFeature_RNA", 
+			"S.Score", "G2M.Score", 
+			"Dissociation")
+	QC_feats <- intersect(QC_feats, colnames(SeuratObject@meta.data))
+
+	A <- DoMultiDotPlot(SeuratObject, sg, GSC = GSC, show_NCells = show_NCells)
+	B <- plot_grid(plotlist = sapply(QC_feats, function(feat) {
+			       plot1 <- VlnPlot(SeuratObject, group.by="init_assign", 
+						features=feat, pt.size=0.2)
+			       plot1 <- plot1 + theme(axis.title.x=element_blank(),
+						      axis.text.x=element_text(size=10),
+						      plot.margin=unit(c(1,1,1,5),"mm")
+						      ) + NoLegend()
+			       return(plot1)
+			}, simplify = FALSE), ncol=length(QC_feats))
+
+	plot_res <- plot_grid(A,B, ncol=1, rel_heights = c(0.8,0.2))
+	return(plot_res)
+}
+
 
 #' Save markers as individual CSV files 
 #' 
