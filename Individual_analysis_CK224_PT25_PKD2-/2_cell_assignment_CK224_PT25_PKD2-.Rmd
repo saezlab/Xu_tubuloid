@@ -1,0 +1,223 @@
+---
+title: "CK224 whole tissue biopsy, PKD2- genotype: cell assignment"
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+
+
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load libraries and auxiliar functions
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(GSEABase))
+suppressPackageStartupMessages(require(dplyr))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(ComplexHeatmap))
+suppressPackageStartupMessages(require(clustree))
+suppressPackageStartupMessages(require(cowplot))
+suppressPackageStartupMessages(require(openxlsx))
+source("../src/seurat_fx.R")
+```
+
+## Load SeuratObject with initial clustering outcome
+```{r load_init}
+SeuratObject <- readRDS("./output/1_initial_clustering/data/SeuratObject.rds")
+```
+
+## Define output directory
+```{r def_out}
+# Define output directory
+OUTDIR <- paste0("./output/2_cell_assignment/")
+if(! dir.exists(OUTDIR)) dir.create(OUTDIR, recursive = TRUE)
+```
+
+## Cell marker extraction
+We are going to use two methods for the extraction of cell markers.   
+1. Differential gene expression using wilcox test from Seurat. Only positive
+   and consistent markers will be tested (with default parameters).   
+2. GenesorteR to get posterior probabilities for each gene of observing a certain
+cell population.
+
+### 1 wilcox test
+
+```{r wilcox, cache=FALSE}
+up <- setNames(vector("list",length=length(levels(SeuratObject))), 
+               levels(SeuratObject))
+for(idx in names(up)) {
+  up.idx <- FindMarkers(SeuratObject,ident.1 = idx, 
+                        ident.2 = setdiff(levels(SeuratObject), idx), only.pos=T)
+  cols_names <- colnames(up.idx)
+  
+  # Add two extra cols
+  up.idx$cluster <- idx
+  up.idx$gene <- rownames(up.idx)
+  
+  up[[idx]] <- up.idx
+}
+```
+
+### 2 Gene sorter
+
+```{r genesort, cache=FALSE}
+sg <- sortGenes(SeuratObject@assays$RNA@data, Idents(SeuratObject))
+```
+
+Finally we save the markers for manual exploration:
+
+```{r init_markers_save, warning=FALSE}
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+saveMarkers.CSV(up, OUTDIR)
+saveMarkers.CSV(sg, OUTDIR)
+```
+
+## Cell assignment
+
+```{r cellQual}
+FeaturePlot(SeuratObject, 
+	    features=c("percent.mt", "nFeature_RNA", 
+		       "S.Score", "G2M.Score"), 
+	    label=TRUE, label.size=7)
+```
+
+```{r CellCycle, fig.width=7, fig.height=5}
+VlnPlot(SeuratObject, features=c("S.Score", "G2M.Score"))
+```
+
+| Cluster 0 | T-cells : CD96, PTPRC |
+| Cluster 1 | LOH, TAL : SLC12A1, NOS1 |
+| Cluster 2 | Cyst.PT : LRP2, VCAM1 |
+| Cluster 3 | dediff.PT(STC) : DCDC2, CD24|
+| Cluster 4 | Monocytes/Macrophages : MS4A1, CD74 |
+| Cluster 5 | VSMCs : CNN1, MYH11 |
+| Cluster 6 | PECs : LRP2, ANXA3 |
+| Cluster 7 | Macrophages : PTPRC, MSR1, CSFR2RA, STAB1 |
+| Cluster 8 | CTL/NK cells : PTPRC, GZMB, CD247 |
+| Cluster 9 | ECs : PECAM1 |
+| cluster 10 | Fibroblast : MEG3, DCN |
+| cluster 11 | B-cells : POU2AF1, ZNF215, MZB1 |
+| cluster 12 | Mast cells : PTPRC, KIT, CPA3 |
+| cluster 13 | dediff.PT(STC) : HAVCR1, LRP2 |
+| cluster 14 | IC-A : SLC4A1 |
+
+
+```{r rename_idents}
+ren_id <- c("0"="T-cell",
+            "1"="Cyst.LOH,TAL-cell",
+            "2"="Cyst.PT",
+            "3"="STC_1",
+            "4"="Mono/Mac",
+            "5"="VSMC",
+            "6"="PEC",
+            "7"="Mac",
+            "8"="CTL/NK-cell",
+            "9"="EC",
+            "10"="Fibroblast",
+	    "11"="B-cell",
+	    "12"="Mast-cell",
+	    "13"="STC_2",
+	    "14"="Cyst.IC-A")
+print(ren_id)
+stopifnot(length(ren_id)==length(levels(SeuratObject)))
+```
+
+```{r cell_ann}
+stopifnot(all(names(ren_id) %in% levels(SeuratObject)))
+stopifnot(length(ren_id) == length(levels(SeuratObject)))
+
+SeuratObject <- RenameIdents(SeuratObject, ren_id)
+SeuratObject$init_assign <- factor(as.character(Idents(SeuratObject)))
+
+colnames(sg$condGeneProb) <- ren_id[colnames(sg$condGeneProb)]
+colnames(sg$specScore) <- ren_id[colnames(sg$specScore)]
+```
+
+## Kidney markers
+
+```{r load_markers}
+AdultOrganoid <- getGmt("../data/Prior/adultorganoid_markers.gmt")
+AdultOrganoid <- GeneSetCollection(lapply(AdultOrganoid, function(GS) {
+			  GS@geneIds <- intersect(GS@geneIds, rownames(SeuratObject))
+			  GS@geneIds <- intersect(GS@geneIds, rownames(sg$condGeneProb))
+			  return(GS)
+	    }))
+AdultOrganoid <- AdultOrganoid[unlist(lapply(geneIds(AdultOrganoid), length)) > 0]
+```
+
+```{r AdultOrganoid_mhp, fig.width=16, fig.height=14, dpi=300, warning=FALSE}
+DoMultiHeatmap(SeuratObject, sg, GSC = AdultOrganoid, assay = "RNA", show_plot = TRUE)
+```
+
+```{r AdultOrganoid_dplot, fig.width=16, fig.height=14, dpi=300, warning=FALSE}
+DoMultiDotPlot(SeuratObject, sg, GSC = AdultOrganoid)
+```
+
+```{r ClustReport, fig.width=16, fig.height=17, dpi=300, warning=FALSE}
+DoClustReport(SeuratObject, sg, AdultOrganoid, show_NCells=TRUE)
+```
+
+## Cyst markers
+
+```{r load_markers2}
+Cyst <- getGmt("../data/Prior/cyst.gmt")
+Cyst <- GeneSetCollection(lapply(Cyst, function(GS) {
+			  GS@geneIds <- intersect(GS@geneIds, rownames(SeuratObject))
+			  GS@geneIds <- intersect(GS@geneIds, rownames(sg$condGeneProb))
+			  return(GS)
+	    }))
+Cyst <- Cyst[unlist(lapply(geneIds(Cyst), length)) > 0]
+```
+
+```{r Cyst_mhp, fig.width=16, fig.height=6, dpi=300, warning=FALSE}
+DoMultiHeatmap(SeuratObject, sg, GSC = Cyst, assay = "RNA", show_plot = TRUE)
+```
+
+```{r Cyst_dplot, fig.width=16, fig.height=6, dpi=300, warning=FALSE}
+DoMultiDotPlot(SeuratObject, sg, GSC = Cyst)
+```
+
+## UMAP plot
+```{r}
+DimPlot(SeuratObject, reduction = "umap", label=TRUE)
+```
+
+## Archive processed data for downstream analysis
+
+```{r assign_record}
+# new idents
+write.table(data.frame("Ident"=SeuratObject@active.ident),
+            file=paste0(OUTDIR,"/active_idents.tsv"),
+            sep="\t", col.names = NA, row.names = TRUE, quote=TRUE)
+```
+
+```{r, mkdir_data}
+DATA_DIR <- paste0(OUTDIR,"/data")
+if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
+```
+
+```{r save_S}
+saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
+saveRDS(up, file=paste0(OUTDIR,"/wilcox_up.rds"))
+saveRDS(sg, file=paste0(OUTDIR,"/genesorter_out.rds"))
+
+# After Rename Idents
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+
+```                                                                                                                                                                                                         
+
+## Session info
+
+```{r}
+sessionInfo()
+{                                                                                                                                                                                                           
+sink(file=paste0(OUTDIR,"/sessionInfo.txt"))
+print(sessionInfo())
+sink()
+}
+```
