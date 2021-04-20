@@ -1,0 +1,17 @@
+cell,group,nCells,nReplicates
+IC-A,healthy,637,2
+IC-A,ADPKD,476,3
+IC-B,healthy,143,2
+IC-B,ADPKD,394,3
+PC-CD,healthy,1,1
+PC-CD,ADPKD,2813,2
+PT_1,healthy,2404,2
+PT_1,ADPKD,427,2
+PT_2,healthy,444,2
+PT_2,ADPKD,774,3
+PT_3-PEC-POD,healthy,37,2
+PT_3-PEC-POD,ADPKD,526,3
+TAL_1,healthy,1223,2
+TAL_1,ADPKD,1114,3
+TAL_2,healthy,125,2
+TAL_2,ADPKD,2020,3

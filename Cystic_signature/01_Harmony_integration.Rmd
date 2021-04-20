@@ -1,0 +1,189 @@
+---
+title: "Harmony integration of adult kidney tissue from ADPKD and control samples- "
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+
+# Output directory
+OUTDIR <- "./01_harmony_integration/"
+if(!dir.exists(OUTDIR)) dir.create(OUTDIR);
+# Figures
+FIGDIR <- paste0(OUTDIR, "/figures/")
+knitr::opts_chunk$set(fig.path=FIGDIR)
+knitr::opts_chunk$set(dev=c('png', 'pdf'))
+# Data
+DATADIR <- paste0(OUTDIR, "/data/")
+if(!dir.exists(DATADIR)) dir.create(DATADIR);
+```
+
+## Load libraries and auxiliar functions
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(harmony))
+suppressPackageStartupMessages(require(cowplot))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(openxlsx))
+source("../src/seurat_fx.R")
+```
+
+## Load SeuratObject with initial clustering outcome
+```{r load_init}
+CK224 <- readRDS(paste0("../Individual_analysis_CK224_PT25_PKD2-/",
+			"output/2_cell_assignment/data/SeuratObject.rds"))
+CK224$final_Ident <- Idents(CK224)
+CK224_umap <- DimPlot(CK224, reduction="umap", label=TRUE) + NoLegend() + ggtitle(Project(CK224))
+
+CK225 <- readRDS(paste0("../Individual_analysis_CK225_PT8_PKD1-/",
+			"output/2_cell_assignment/data/SeuratObject.rds"))
+CK225$final_Ident <- Idents(CK225)
+CK225_umap <- DimPlot(CK225, reduction="umap", label=TRUE) + NoLegend() + ggtitle(Project(CK225))
+
+Control1 <- readRDS(paste0("../Individual_analysis_Control1/",
+			"output/2_cell_assignment/data/SeuratObject.rds"))
+Control1$final_Ident <- Idents(Control1)
+Control1$orig.ident <- factor(paste0("Control1_", as.character(Control1$orig.ident)))
+Control1_umap <- DimPlot(Control1, reduction="umap", label=TRUE) + NoLegend() + ggtitle(Project(Control1))
+
+Control2 <- readRDS(paste0("../Individual_analysis_Control2/",
+			"output/2_cell_assignment/data/SeuratObject.rds"))
+Control2$final_Ident <- Idents(Control2)
+Control2$orig.ident <- factor(paste0("Control2_", as.character(Control2$orig.ident)))
+Control2_umap <- DimPlot(Control2, reduction="umap", label=TRUE) + NoLegend() + ggtitle(Project(Control2))
+
+ADPKD3 <- readRDS(paste0("../Individual_analysis_ADPKD3/",
+			"output/2_cell_assignment/data/SeuratObject.rds"))
+ADPKD3$final_Ident <- Idents(ADPKD3)
+ADPKD3$orig.ident <- factor(paste0("ADPKD3_", as.character(ADPKD3$orig.ident)))
+ADPKD3_umap <- DimPlot(ADPKD3, reduction="umap", label=TRUE) + NoLegend() + ggtitle(Project(ADPKD3))
+
+
+umap_split <- CombinePlots(list(CK224_umap, CK225_umap, ADPKD3_umap, Control1_umap, Control2_umap), ncol=3)
+```
+
+## Merging
+```{r merge}
+S <- merge(ADPKD3, list(CK224, CK225, Control1, Control2))
+rm(CK224, CK225, Control1, Control2, ADPKD3)
+```
+
+## PCA
+```{r pca}
+S <- NormalizeData(S)
+S <- FindVariableFeatures(S, selection.method="vst", nfeatures=2000)
+S <- ScaleData(S, verbose=FALSE)
+S <- RunPCA(S, pc.genes=S@var.genes, npcs=50, verbose= FALSE)
+```
+
+## Batch
+```{r before, fig.width=12, fig.height=4}
+p1 <- DimPlot(object = S, reduction = "pca", pt.size = .1, group.by = "orig.ident", do.return = TRUE)
+p2 <- VlnPlot(object = S, features = "PC_1", group.by = "orig.ident", do.return = TRUE, pt.size = .1)
+CombinePlots(list(p1,p2))
+```
+
+## Run Harmony
+```{r run_harmony}
+S$lab <- ifelse(grepl("(CK[0-9]+|Control|ADPKD)", S$orig.ident), "Kramann", "Other")
+S <- RunHarmony(S, c("lab","orig.ident"), plot_convergence=TRUE)
+```
+
+```{r add_dataset}
+S$orig.ident2 <- sapply(S$orig.ident, function(z) {
+			if(grepl("^(CK224|CK225|CK73|CK77|ADPKD)", z)) {
+				z
+			} else if(grepl("Control", z)) {
+				z
+			} else {
+				stop("ERROR: unexpected sample")
+			}
+})
+
+S$final_Ident2 <- paste0(gsub("_.*$","",S$orig.ident2), "|", S$final_Ident)
+```
+
+```{r after, fig.width=12, fig.height=4}
+p3 <- DimPlot(object = S, reduction = "harmony", pt.size = .1, group.by = "orig.ident", do.return = TRUE)
+p4 <- VlnPlot(object = S, features = "harmony_1", group.by = "orig.ident", do.return = TRUE, pt.size = .1)
+CombinePlots(list(p3,p4))
+```
+
+## UMAP
+```{r umap}
+S <- RunUMAP(S, reduction="harmony", dims=1:20)
+```
+
+```{r umap_split, fig.width=9, fig.height=4}
+umap_split2 <- DimPlot(S, reduction="umap", group.by="final_Ident", label=TRUE, split.by="orig.ident2") + NoLegend()
+```
+
+## Find clusters again
+```{r}
+S$final_Ident2 <- paste0(gsub("_.*", "|",S$orig.ident), S$final_Ident)
+S <- FindNeighbors(S, reduction = "harmony", dims = 1:20)
+S <- FindClusters(S, resolution = 0.5)
+```
+
+```{r umapInt}
+umap_reId <- DimPlot(S, reduction="umap", group.by="ident", label=TRUE, split.by="orig.ident2") + NoLegend()
+```
+
+```{r UMAP_individualAnnotation, fig.width=10, fig.height=9}
+library(ggrepel)
+library(dplyr)
+dat <- data.frame(UMAP_1=S@reductions$umap@cell.embeddings[,1],
+		  UMAP_2=S@reductions$umap@cell.embeddings[,2],
+		  final_Ident=S$final_Ident,
+		  Ident=Idents(S),
+		  dataset=S$orig.ident2
+		  )
+
+labs <- dat %>% group_by(final_Ident, dataset) %>%
+	summarize(coord1=median(UMAP_1),
+		  coord2=median(UMAP_2))
+labs$Ident <- factor(rep(NA, nrow(labs)),
+				 levels=levels(dat$Ident))
+
+labs2 <- dat %>% group_by(Ident) %>%
+	summarize(coord1=median(UMAP_1),
+		  coord2=median(UMAP_2))
+labs2$dataset <- factor(rep(NA, nrow(labs2)),
+			levels=levels(dat$dataset))
+
+ggplot(dat, aes(x=UMAP_1, y=UMAP_2, colour=Ident)) + 
+	geom_point() + 
+# stat_summary(fun.y = mean, geom = "point", colour = "darkred", size = 5) +
+ 	geom_label_repel(data=labs, 
+			  aes(coord1, coord2, 
+			      fill=dataset, label=final_Ident), 
+			  colour="black", size=4) +
+	geom_text(data=labs2, 
+			  aes(coord1, coord2, 
+			      fill=dataset, label=Ident), 
+			  colour="black", size=10) +
+  	 scale_fill_brewer(type = "div", palette = "Set2") +
+	theme_cowplot()
+
+```
+
+```{r}
+DimPlot(S, group.by="final_Ident", label=TRUE)
+```
+
+
+## Save
+```{r save}
+saveRDS(S, file=paste0(DATADIR,"/S.rds"))
+```
+
+## Rsession
+```{r}
+sessionInfo()
+```
+
