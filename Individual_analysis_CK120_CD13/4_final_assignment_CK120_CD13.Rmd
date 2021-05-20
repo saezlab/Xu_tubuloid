@@ -21,6 +21,7 @@ suppressPackageStartupMessages(require(genesorteR))
 suppressPackageStartupMessages(require(ComplexHeatmap))
 suppressPackageStartupMessages(require(clustree))
 suppressPackageStartupMessages(require(cowplot))
+suppressPackageStartupMessages(require(openxlsx))
 source("../src/seurat_fx.R")
 ```
 
@@ -94,29 +95,10 @@ top_markers = apply(sg$specScore, 2, function(x) names(head(sort(x, decreasing =
 ```
 
 Finally we save the markers for manual exploration:
-
-```{r init_markers_save}
-MARKERS_OUTDIR <- paste0(OUTDIR,"/Markers")
-if(! dir.exists(MARKERS_OUTDIR)) dir.create(MARKERS_OUTDIR, recursive = TRUE)
-
-# Wilcox
-## TSV
-write.table(do.call("rbind",up)[c("cluster", "gene", cols_names)],
-	    file = paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_wilcox_DEGs_up.csv"),
-	    sep=",", col.names=TRUE, row.names = FALSE, quote=FALSE
-	    )
-## bin
-saveRDS(up, file=paste0(MARKERS_OUTDIR,"/wilcox_up.rds"))
-
-# Genesorter
-saveRDS(sg, file=paste0(MARKERS_OUTDIR,"/genesorter_out.rds"))
-write.table(as.matrix(sg$specScore), 
-	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_specScore.csv"),
-            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
-
-write.table(as.matrix(sg$condGeneProb), 
-	    paste0(MARKERS_OUTDIR,"/",Project(SeuratObject),"_condGeneProb.csv"),
-            sep=",",row.names = TRUE,col.names = NA,quote=FALSE)
+```{r init_markers_save, warning=FALSE}
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+saveMarkers.CSV(up, OUTDIR)
+saveMarkers.CSV(sg, OUTDIR)
 ```
 
 ## Final cell assignment
@@ -171,7 +153,8 @@ DimPlot(SeuratObject, reduction="umap")
 
 ```{r assign_outcome}
 # final idents
-write.table(data.frame("Ident"=SeuratObject@active.ident),
+write.table(data.frame("Ident"=SeuratObject@active.ident,
+		       "seurat_clusters"=SeuratObject$seurat_clusters),
             file=paste0(OUTDIR,"/active_idents.csv"),
             sep=",", col.names = NA, row.names = TRUE, quote=TRUE)
 ```
@@ -183,7 +166,12 @@ if(!dir.exists(DATA_DIR)) dir.create(DATA_DIR)
 
 ```{r save_S}
 saveRDS(SeuratObject, paste0(DATA_DIR,"/SeuratObject.rds"))
-```                                                                                                                                                                                                         
+saveRDS(up, file=paste0(OUTDIR,"/wilcox_up.rds"))
+saveRDS(sg, file=paste0(OUTDIR,"/genesorter_out.rds"))
+
+# After Rename Idents
+saveMarkers.Excel(up, sg, SeuratObject, OUTDIR)
+```
 
 ## Session info
 
