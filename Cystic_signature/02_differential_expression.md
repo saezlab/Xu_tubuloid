@@ -179,7 +179,6 @@ ren <- c("0"="PC-CD",
      "2" = "TAL_1",
     "3" = "TAL_2",
     "6" = "PT_3-PEC-POD", 
-    "6" = ":Odd",
     "8" = "PT_2",
     "11" ="IC-A",
 #   "13" = "ATL", # NOTE: clustering together with B-cell
@@ -602,6 +601,81 @@ write.table(as.data.frame(pseudobulk_stats),
 ## Enrichment analysis
 
 ``` r
+select_topN <- function(res, topN=5) {
+    topNES <- unique(unlist(lapply(res, function(tab) tab$pathway[order(tab$NES, decreasing=TRUE)[1:topN]])))
+    return(topNES)
+}
+
+matrix_NES <- function(res) {
+    rows <- unique(unlist(lapply(res, function(z) z$pathway)))
+    cols <- names(res)
+    mat <- matrix(NA, nrow = length(rows), ncol=length(cols), dimnames=list(rows, cols))
+    for(idx in names(res)) {
+        tmp <- res[[idx]]
+        mat[tmp$pathway, idx] <- tmp$NES
+    }
+    return(mat)
+}
+
+matrix_padj <- function(res) {
+    rows <- unique(unlist(lapply(res, function(z) z$pathway)))
+    cols <- names(res)
+    mat <- matrix(NA, nrow = length(rows), ncol=length(cols), dimnames=list(rows, cols))
+    for(idx in names(res)) {
+        tmp <- res[[idx]]
+        mat[tmp$pathway, idx] <- tmp$padj
+    }
+    return(mat)
+}
+
+matrix_padj2txt <- function(padj) {
+    padj_txt <- apply(padj, c(1,2), function(pval) {
+                if(is.na(pval)) {
+                    txt <- "nt"
+                } else {
+                  if(pval< 0.001) {
+                      txt <- "***"
+                  } else if (pval < 0.01) {
+                      txt <- "**"
+                  } else if (pval < 0.05) {
+                      txt <- "*"
+                  } else {
+                      txt <- "ns"
+                  }
+                }
+                  return(txt)
+        })
+    return(padj_txt)
+}
+ 
+makeHP <- function(ACT, TXT, cluster_col=FALSE, ttl="GO terms") {
+
+    xx <- ceiling(max(abs(as.numeric(ACT)), na.rm=TRUE))
+    col_fun <- circlize::colorRamp2(c(-1*xx,0,xx), c("blue", "white", "red"))
+    hp <- Heatmap(ACT, col=col_fun, 
+             column_title = ttl,
+             show_row_dend = FALSE, show_column_dend = FALSE,
+             row_names_side = "left", column_names_side="top", 
+             row_names_gp = gpar(fontsize = 10),
+             cell_fun = function(j, i, x, y, width, height, fill) {
+                 grid.text(#paste0(sprintf("%.2f", ACT[i, j]),
+                    #      " (",TXT[i, j],")"), 
+                       TXT[i,j],
+                       x, y, 
+                       gp = gpar(fontsize = 12,
+                         fontface = ifelse(TXT[i,j]!="ns",
+                                   "bold","plain"),
+                         col = ifelse(ACT[i,j] < -1,
+                                  "white","black"))
+                       )
+             }
+             ,
+             name="NES")
+    return(hp)
+}
+```
+
+``` r
 GO <- getGmt("../data/Prior/c5.all.v7.0.symbols.gmt")
 GO <- geneIds(GO)
 GO.res <- lapply(signatures, function(rnk) {
@@ -627,27 +701,15 @@ GO.res <- lapply(signatures, function(rnk) {
     ## The order of those tied genes will be arbitrary, which may produce unexpected results.
 
 ``` r
-top5NES <- unique(unlist(lapply(GO.res, function(tab) tab$pathway[order(tab$NES, decreasing=TRUE)[1:5]])))
+top5NES <- select_topN(GO.res, topN = 5)
 
-NESres <- lapply(GO.res, function(tab) {
-             paths <- intersect(tab$pathway, top5NES)
-             nes <- setNames(tab$NES, tab$pathway)
-             res <- nes[top5NES]
-             names(res) <- top5NES
-             return(res)
-})
-NESmat <- do.call("cbind", NESres)
-rownames(NESmat)<- gsub("GO_", "", rownames(NESmat))
+ACT <- matrix_NES(res = GO.res)[top5NES, ]
+PAD <- matrix_padj(GO.res)[top5NES, ]
+TXT <- matrix_padj2txt(PAD)
 
-xx <- floor(max(abs(as.numeric(NESmat)), na.rm=TRUE))
-col_fun <- circlize::colorRamp2(c(-1*xx,0,xx), c("blue", "white", "red"))
-draw(Heatmap(NESmat, col=col_fun, 
-         column_title = "GO terms",
-         show_row_dend = FALSE, show_column_dend = FALSE,
-         row_names_side = "left", column_names_side="top", 
-         row_names_gp = gpar(fontsize = 10),
-         name="NES"),
-     padding = unit(c(2,130,2,2), "mm"))
+hp <- makeHP(ACT = ACT,TXT = TXT, ttl = "GO terms")
+
+draw(hp, padding = unit(c(2,130,2,2), "mm"))
 ```
 
 ![](./02_differential_expression//figures/fgsea_GO-1.png)<!-- -->
@@ -679,26 +741,15 @@ PID.res <- lapply(signatures, function(rnk) {
     ## The order of those tied genes will be arbitrary, which may produce unexpected results.
 
 ``` r
-top5NES <- unique(unlist(lapply(PID.res, function(tab) tab$pathway[order(tab$NES, decreasing=TRUE)[1:5]])))
+top5NES <- select_topN(PID.res, topN = 5)
 
-NESres <- lapply(PID.res, function(tab) {
-             paths <- intersect(tab$pathway, top5NES)
-             nes <- setNames(tab$NES, tab$pathway)
-             res <- nes[top5NES]
-             names(res) <- top5NES
-             return(res)
-})
-NESmat <- do.call("cbind", NESres)
-rownames(NESmat) <- gsub("PID_","", gsub("_?PATHWAY","", rownames(NESmat)))
+ACT <- matrix_NES(res = PID.res)[top5NES, ]
+PAD <- matrix_padj(PID.res)[top5NES, ]
+TXT <- matrix_padj2txt(PAD)
 
-xx <- floor(max(abs(as.numeric(NESmat)), na.rm=TRUE))
-col_fun <- circlize::colorRamp2(c(-1*xx,0,xx), c("blue", "white", "red"))
-draw(Heatmap(NESmat, col=col_fun, column_title = "PID", 
-         show_row_dend = FALSE, show_column_dend = FALSE,
-         row_names_side = "left", column_names_side="top", 
-         row_names_gp = gpar(fontsize = 10),
-         name="NES"),
-     padding=unit(c(2,30,2,2),"mm"))
+hp <- makeHP(ACT = ACT,TXT = TXT, ttl = "PID")
+
+draw(hp, padding=unit(c(2,30,2,2),"mm"))
 ```
 
 ![](./02_differential_expression//figures/fgsea_PID-1.png)<!-- -->
@@ -730,27 +781,15 @@ KEGG.res <- lapply(signatures, function(rnk) {
     ## The order of those tied genes will be arbitrary, which may produce unexpected results.
 
 ``` r
-top5NES <- unique(unlist(lapply(KEGG.res, function(tab) tab$pathway[order(tab$NES, decreasing=TRUE)[1:5]])))
+top5NES <- select_topN(KEGG.res, topN = 5)
 
-NESres <- lapply(KEGG.res, function(tab) {
-             paths <- intersect(tab$pathway, top5NES)
-             nes <- setNames(tab$NES, tab$pathway)
-             res <- nes[top5NES]
-             names(res) <- top5NES
-             return(res)
-})
-NESmat <- do.call("cbind", NESres)
-rownames(NESmat) <- gsub("KEGG_","", rownames(NESmat))
+ACT <- matrix_NES(res = KEGG.res)[top5NES, ]
+PAD <- matrix_padj(KEGG.res)[top5NES, ]
+TXT <- matrix_padj2txt(PAD)
 
-xx <- floor(max(abs(as.numeric(NESmat)), na.rm=TRUE))
-col_fun <- circlize::colorRamp2(c(-1*xx,0,xx), c("blue", "white", "red"))
-draw(Heatmap(NESmat, col=col_fun, 
-         column_title = "KEGG",
-         show_row_dend = FALSE, show_column_dend = FALSE,
-         row_names_side = "left", column_names_side="top", 
-         row_names_gp = gpar(fontsize = 10),
-         name="NES"),
-     padding=unit(c(2,90,2,2),"mm"))
+hp <- makeHP(ACT = ACT,TXT = TXT, ttl = "KEGG")
+
+draw(hp, padding=unit(c(2,90,2,2),"mm"))
 ```
 
 ![](./02_differential_expression//figures/fgsea_KEGG-1.png)<!-- -->
@@ -772,13 +811,22 @@ pres <- lapply(signatures, function(k) {
     res <- cbind(Score=progeny.res[,1], Pvalue=pvals[,1])
 })
 
-pmat <- do.call("cbind",lapply(pres, function(k) k[,"Score"]))
+pres <- lapply(pres, function(z) {
+               z <- as.data.frame(z)
+            z$padj <- p.adjust(z$Pvalue, method = "fdr")
+               return(z)
 
-xx <- floor(max(abs(as.numeric(pmat)), na.rm=TRUE))
-col_fun <- circlize::colorRamp2(c(-1*xx,0,xx), c("blue", "white", "red"))
-Heatmap(pmat, col=col_fun, row_names_side = "left", column_names_side = "top", 
-    column_title = "PROGENy",
-    show_row_dend=FALSE, show_column_dend=FALSE, name="Activity")
+})
+
+pmat <- do.call("cbind",lapply(pres, function(k) k[,"Score"]))
+rownames(pmat) <- rownames(pres[[1]])
+
+pmat_padj <- do.call("cbind", lapply(pres, function(k) k[, "padj"]))
+rownames(pmat_padj) <- rownames(pres[[1]])
+
+TXT <- matrix_padj2txt(pmat_padj)
+
+makeHP(ACT = pmat,TXT = TXT, ttl = "PROGENy")
 ```
 
 ![](./02_differential_expression//figures/progeny-1.png)<!-- -->
@@ -815,34 +863,6 @@ viper_res <- lapply(viper_res, function(mat) {
                 colnames(mat)[1] <- "NES"
                 return(mat)
          })
-```
-
-``` r
-# set.seed(1234)
-# GO_t2g <- data.frame(term=unlist(sapply(names(GO), function(k) rep(k, length(GO[[k]])))),
-#            gene = unlist(GO))
-# ng <- lapply(ttags, function(k)  {
-#            rownames(subset(k$table, FDR<0.05))
-#           })
-# 
-# ng <- ng[unlist(lapply(ng, length)) > 10]
-# en = lapply(ng, function(x) enricher(x, TERM2GENE=GO_t2g, minGSSize = 10, maxGSSize = 200, pvalueCutoff = 0.05))
-# 
-# # Pvalues are ranked already
-# top5GS <- unique(unlist(lapply(en, function(z) z@result$ID[1:5])))
-# print(top5GS)
-# 
-# en_mat <- do.call("cbind",lapply(en, function(z) -log10(z@result[top5GS, "p.adjust"])))
-# rownames(en_mat) <- gsub("GO_","", top5GS)
-# 
-# draw(Heatmap(en_mat, col=c("white", "green4"), 
-#        column_title = "GO terms",
-#        cluster_rows = FALSE, cluster_columns = FALSE,
-#        show_row_dend = FALSE, show_column_dend = FALSE,
-#        row_names_side = "left", column_names_side="top", 
-#        name="-log10(Adj.P.Val)"),
-#      padding = unit(c(2,130,2,2), "mm"))
-# 
 ```
 
 ## Load markers of ADPKD
@@ -883,23 +903,11 @@ ADPKD.res <- lapply(signatures, function(rnk) {
 ``` r
 top5NES <- names(ADPKD)
 
-NESres <- lapply(ADPKD.res, function(tab) {
-             paths <- intersect(tab$pathway, top5NES)
-             nes <- setNames(tab$NES, tab$pathway)
-             res <- nes[top5NES]
-             names(res) <- top5NES
-             return(res)
-})
-NESmat <- do.call("cbind", NESres)
+ACT <- matrix_NES(res = ADPKD.res)[top5NES, ]
+PAD <- matrix_padj(ADPKD.res)[top5NES, ]
+TXT <- matrix_padj2txt(PAD)
 
-xx <- floor(max(abs(as.numeric(NESmat)), na.rm=TRUE))
-col_fun <- circlize::colorRamp2(c(-1*xx,0,xx), c("blue", "white", "red"))
-draw(Heatmap(NESmat, col=col_fun, 
-         column_title = "ADPKD pathways",
-         show_row_dend = FALSE, show_column_dend = FALSE,
-         row_names_side = "left", column_names_side="top", 
-         name="NES"),
-     padding=unit(c(2,20,2,2),"mm"))
+makeHP(ACT = ACT,TXT = TXT, ttl = "ADPKD")
 ```
 
 ![](./02_differential_expression//figures/fgsea_ADPKD-1.png)<!-- -->
@@ -972,7 +980,6 @@ for(cell in names(DGELRT_list)) {
     writeData(wb, sheet ="PID", x=tmp, rowNames=FALSE)
     # GO terms
     addWorksheet(wb, sheetName = "GOterms")
-#   writeData(wb, sheet ="GOterms", x=en[[cell]]@result, rowNames=FALSE)
     writeData(wb, sheet ="GOterms", x=GO.res[[cell]], rowNames=FALSE)
 
     saveWorkbook(wb, file =  fl, overwrite = TRUE)

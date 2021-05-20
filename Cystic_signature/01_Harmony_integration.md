@@ -23,13 +23,7 @@ CK224 <- readRDS(paste0("../Individual_analysis_CK224_PT25_PKD2-/",
             "output/2_cell_assignment/data/SeuratObject.rds"))
 CK224$final_Ident <- Idents(CK224)
 CK224_umap <- DimPlot(CK224, reduction="umap", label=TRUE) + NoLegend() + ggtitle(Project(CK224))
-```
 
-    ## Warning: Using `as.character()` on a quosure is deprecated as of rlang 0.3.0.
-    ## Please use `as_label()` or `as_name()` instead.
-    ## This warning is displayed once per session.
-
-``` r
 CK225 <- readRDS(paste0("../Individual_analysis_CK225_PT8_PKD1-/",
             "output/2_cell_assignment/data/SeuratObject.rds"))
 CK225$final_Ident <- Idents(CK225)
@@ -149,30 +143,26 @@ CombinePlots(list(p3,p4))
 S <- RunUMAP(S, reduction="harmony", dims=1:20)
 ```
 
-    ## Warning: The default method for RunUMAP has changed from calling Python UMAP via reticulate to the R-native UWOT using the cosine metric
-    ## To use Python UMAP via reticulate, set umap.method to 'umap-learn' and metric to 'correlation'
-    ## This message will be shown once per session
+    ## 12:46:28 UMAP embedding parameters a = 0.9922 b = 1.112
 
-    ## 15:23:17 UMAP embedding parameters a = 0.9922 b = 1.112
+    ## 12:46:28 Read 26509 rows and found 20 numeric columns
 
-    ## 15:23:17 Read 26509 rows and found 20 numeric columns
+    ## 12:46:28 Using Annoy for neighbor search, n_neighbors = 30
 
-    ## 15:23:17 Using Annoy for neighbor search, n_neighbors = 30
-
-    ## 15:23:17 Building Annoy index with metric = cosine, n_trees = 50
+    ## 12:46:28 Building Annoy index with metric = cosine, n_trees = 50
 
     ## 0%   10   20   30   40   50   60   70   80   90   100%
 
     ## [----|----|----|----|----|----|----|----|----|----|
 
     ## **************************************************|
-    ## 15:23:21 Writing NN index file to temp file /tmp/RtmpnWCkUl/file3afb5fcb9b4
-    ## 15:23:21 Searching Annoy index using 1 thread, search_k = 3000
-    ## 15:23:31 Annoy recall = 100%
-    ## 15:23:32 Commencing smooth kNN distance calibration using 1 thread
-    ## 15:23:33 Initializing from normalized Laplacian + noise
-    ## 15:23:36 Commencing optimization for 200 epochs, with 1194052 positive edges
-    ## 15:24:01 Optimization finished
+    ## 12:46:33 Writing NN index file to temp file /tmp/RtmpbzT78E/file7d9a124ac762
+    ## 12:46:33 Searching Annoy index using 1 thread, search_k = 3000
+    ## 12:46:43 Annoy recall = 100%
+    ## 12:46:44 Commencing smooth kNN distance calibration using 1 thread
+    ## 12:46:45 Initializing from normalized Laplacian + noise
+    ## 12:46:48 Commencing optimization for 200 epochs, with 1194052 positive edges
+    ## 12:47:13 Optimization finished
 
 ``` r
 umap_split2 <- DimPlot(S, reduction="umap", group.by="final_Ident", label=TRUE, split.by="orig.ident2") + NoLegend()
@@ -210,20 +200,6 @@ umap_reId <- DimPlot(S, reduction="umap", group.by="ident", label=TRUE, split.by
 ``` r
 library(ggrepel)
 library(dplyr)
-```
-
-    ## 
-    ## Attaching package: 'dplyr'
-
-    ## The following objects are masked from 'package:stats':
-    ## 
-    ##     filter, lag
-
-    ## The following objects are masked from 'package:base':
-    ## 
-    ##     intersect, setdiff, setequal, union
-
-``` r
 dat <- data.frame(UMAP_1=S@reductions$umap@cell.embeddings[,1],
           UMAP_2=S@reductions$umap@cell.embeddings[,2],
           final_Ident=S$final_Ident,
@@ -244,7 +220,7 @@ labs2$dataset <- factor(rep(NA, nrow(labs2)),
             levels=levels(dat$dataset))
 
 ggplot(dat, aes(x=UMAP_1, y=UMAP_2, colour=Ident)) + 
-    geom_point() + 
+    geom_point(size=1) + 
 # stat_summary(fun.y = mean, geom = "point", colour = "darkred", size = 5) +
     geom_label_repel(data=labs, 
               aes(coord1, coord2, 
@@ -263,7 +239,7 @@ ggplot(dat, aes(x=UMAP_1, y=UMAP_2, colour=Ident)) +
 ![](./01_harmony_integration//figures/UMAP_individualAnnotation-1.png)<!-- -->
 
 ``` r
-DimPlot(S, group.by="final_Ident", label=TRUE)
+DimPlot(S, group.by="final_Ident", label=TRUE) + NoLegend()
 ```
 
 ![](./01_harmony_integration//figures/unnamed-chunk-2-1.png)<!-- -->

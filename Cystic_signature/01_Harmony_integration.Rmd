@@ -134,7 +134,7 @@ S <- FindClusters(S, resolution = 0.5)
 umap_reId <- DimPlot(S, reduction="umap", group.by="ident", label=TRUE, split.by="orig.ident2") + NoLegend()
 ```
 
-```{r UMAP_individualAnnotation, fig.width=10, fig.height=9}
+```{r UMAP_individualAnnotation, fig.width=14, fig.height=9, dpi=300}
 library(ggrepel)
 library(dplyr)
 dat <- data.frame(UMAP_1=S@reductions$umap@cell.embeddings[,1],
@@ -157,7 +157,7 @@ labs2$dataset <- factor(rep(NA, nrow(labs2)),
 			levels=levels(dat$dataset))
 
 ggplot(dat, aes(x=UMAP_1, y=UMAP_2, colour=Ident)) + 
-	geom_point() + 
+	geom_point(size=1) + 
 # stat_summary(fun.y = mean, geom = "point", colour = "darkred", size = 5) +
  	geom_label_repel(data=labs, 
 			  aes(coord1, coord2, 
@@ -173,7 +173,7 @@ ggplot(dat, aes(x=UMAP_1, y=UMAP_2, colour=Ident)) +
 ```
 
 ```{r}
-DimPlot(S, group.by="final_Ident", label=TRUE)
+DimPlot(S, group.by="final_Ident", label=TRUE) + NoLegend()
 ```
 
 
