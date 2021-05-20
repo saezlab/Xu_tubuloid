@@ -21,8 +21,10 @@ Define the output directory for figures and tables
 OUTDIR <- "./output/"
 if(!dir.exists(OUTDIR)) dir.create(OUTDIR)
 
-FIGSDIR <- paste(OUTDIR,"/figs")
-TABSDIR <- paste(OUTDIR,"/tabs")
+FIGSDIR <- paste0(OUTDIR,"/figs/")
+knitr::opts_chunk$set(fig.path=FIGSDIR)
+knitr::opts_chunk$set(dev=c('png','pdf'))
+knitr::opts_chunk$set(dpi=300)
 ```
 
 ## Combine samples
@@ -30,7 +32,10 @@ Load and merge the individual samples from the project
 
 ```{r load_SeuratObjects}
 list_rds <- c("CK5_organoid"="../Individual_analysis_CK5_early_organoid/output/4_final_assignment/data/SeuratObject.rds",
-	      "CK119_organoid"="../Individual_analysis_CK119_late_organoid/output/2_cell_assignment/data/SeuratObject.rds",
+	      "CK119_organoid"="../Individual_analysis_CK119_late_organoid/output/4_final_assignment/data/SeuratObject.rds",
+	      "JX1_HC_organoid"="../Individual_analysis_JX1_HC_organoid/output/4_final_assignment/data/SeuratObject.rds",
+	      "JX2_PDK1KO_organoid"="../Individual_analysis_JX2_PKD1KO_organoid/output/4_final_assignment/data/SeuratObject.rds",
+	      "JX3_PDK2KO_organoid"="../Individual_analysis_JX3_PKD2KO_organoid/output/4_final_assignment/data/SeuratObject.rds",
 	      "CK120_CD13"="../Individual_analysis_CK120_CD13/output/4_final_assignment/data/SeuratObject.rds",
 	      "CK121_CD24"="../Individual_analysis_CK121_CD24/output/4_final_assignment/data/SeuratObject.rds")
 
@@ -56,37 +61,63 @@ for(sname in names(list_rds)) {
 cols <- readRDS(file="./output/color_scheme.rds")
 ```
 
-```{r CK5_organoid_umap_final, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
+```{r CK5_organoid_umap_final, dpi=600}
 umap_cols <- cols[levels(get("CK5_organoid")@active.ident)]
-DimPlot(get("CK5_organoid"), reduction="umap", cols = umap_cols[], label=TRUE)
+CK5_umap <- DimPlot(get("CK5_organoid"), reduction="umap", cols = umap_cols[], label=TRUE, repel=TRUE)
+# print(CK5_umap)
 ```
 
-```{r CK119_organoid_umap_final, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
+```{r CK119_organoid_umap_final, dpi=600}
 umap_cols <- cols[levels(get("CK119_organoid")@active.ident)]
-DimPlot(get("CK119_organoid"), reduction="umap", cols = umap_cols[], label = TRUE)
+CK119_umap <- DimPlot(get("CK119_organoid"), reduction="umap", cols = umap_cols[], label = TRUE, repel=TRUE)
+# print(CK119_umap)
 ```
 
-```{r CK120_CD13_umap_final, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
+```{r CK120_CD13_umap_final, dpi=600}
 umap_cols <- cols[levels(get("CK120_CD13")@active.ident)]
-DimPlot(get("CK120_CD13"), reduction="umap", cols = umap_cols[], label=TRUE)
+CK120_umap <- DimPlot(get("CK120_CD13"), reduction="umap", cols = umap_cols[], label=TRUE, repel=TRUE)
+# print(CK120_umap)
 ```
 
-```{r CK121_CD24_umap_final, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
+```{r CK121_CD24_umap_final, dpi=600}
 umap_cols <- cols[levels(get("CK121_CD24")@active.ident)]
-DimPlot(get("CK121_CD24"), reduction="umap", cols = umap_cols[], label=TRUE)
+CK121_umap <- DimPlot(get("CK121_CD24"), reduction="umap", cols = umap_cols[], label=TRUE, repel=TRUE)
+# print(CK121_umap)
 ```
 
-# Merge samples
+```{r JX1_organoid_umap_final, dpi=600}
+umap_cols <- cols[levels(get("JX1_HC_organoid")@active.ident)]
+JX1_umap <- DimPlot(get("JX1_HC_organoid"), reduction="umap", cols = umap_cols[], label = TRUE, repel=TRUE)
+print(JX1_umap)
+```
+
+
+```{r JX2_organoid_umap_final, dpi=600}
+umap_cols <- cols[levels(get("JX2_PDK1KO_organoid")@active.ident)]
+JX2_umap <- DimPlot(get("JX2_PDK1KO_organoid"), reduction="umap", cols = umap_cols[], label = TRUE, repel=TRUE)
+# print(JX2_umap)
+```
+
+```{r JX3_organoid_umap_final, dpi=600}
+umap_cols <- cols[levels(get("JX3_PDK2KO_organoid")@active.ident)]
+JX3_umap <- DimPlot(get("JX3_PDK2KO_organoid"), reduction="umap", cols = umap_cols[], label = TRUE, repel=TRUE)
+# print(JX3_umap)
+```
+
+Change order of legends
+
+```{r}
+for(obj in ls(pattern="_umap$")) {
+	assign(obj, get(obj) + theme(legend.position="bottom", legend.direction = "vertical"))
+}
+```
+
+# Merged-sample report
 ```{r merge}
 # Merge ind
 SeuratObject <- merge(x=get(x = snames[1]), y=sapply(snames[-1], get), add.cell.ids = snames)
 # Clean mem
 rm(list = snames)
-```
-
-```{r group_classes}
-pop_clss <- setNames(gsub("-like","",gsub("_[0-9]+$","",levels(Idents(SeuratObject)))),
-                     levels(Idents(SeuratObject)))
 ```
 
 ## Figures
@@ -96,12 +127,12 @@ if(! dir.exists(FIGSDIR)) dir.create(FIGSDIR, recursive = TRUE)
 ```
 
 
-```{r merged_cell_prop, fig.width=7, fig.height=3, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
-cell_pop <- table(SeuratObject$orig.ident,pop_clss[Idents(SeuratObject)])
+```{r merged_cell_prop, fig.width=10, fig.height=4, dpi=600}
+cell_pop <- table(SeuratObject$orig.ident,Idents(SeuratObject))
 cell_pop_perc <- (sweep(cell_pop,MARGIN = 1, STATS = rowSums(cell_pop), FUN = "/")) * 100
 cell_pop_perc2 <- reshape2::melt(cell_pop_perc)
 cell_pop_perc2$Var1 <- relevel(cell_pop_perc2$Var1, ref = "CK5_organoid")
-cell_pop_perc2$Var2 <- relevel(cell_pop_perc2$Var2, ref="Unknown")
+
 
 ggplot(cell_pop_perc2, aes(x= Var1, fill=Var2, y=value)) +
     geom_col(position = position_stack(reverse=TRUE)) + 
@@ -112,14 +143,34 @@ ggplot(cell_pop_perc2, aes(x= Var1, fill=Var2, y=value)) +
         axis.title.x = element_text(size=18, color = "black"), axis.title.y = element_blank(),
         axis.text.x = element_text(size=14, color = "black"),
         axis.text.y = element_text(size=12, color = "black"),
-	      panel.border=element_blank(),
         panel.grid = element_blank())
+
+# Split barcodes per sample for future plotting
+bp_res <- lapply(split(cell_pop_perc2, cell_pop_perc2$Var1), function(df) {
+	       ggplot(df, aes(x= Var1, fill=Var2, y=value)) +
+		       geom_col(position = position_stack(reverse=TRUE)) + 
+		       scale_fill_manual(values = cols[levels(df$Var2)]) +
+ 		       scale_y_continuous(breaks=c(0,100), 
+					   expand=c(0,0)) + 
+		scale_x_discrete(expand=c(0,0)) + 
+		       labs(y="Percentage of cells (%)") + theme_bw() + coord_flip() +
+		       theme(legend.position="none",
+			     legend.key.size = unit(0.5, "cm"),
+			     axis.ticks.y = element_blank(),
+			     axis.title = element_blank(),
+			     axis.text.x = element_text(size=14, color = "black"),
+			     axis.text.y = element_blank(),
+			     plot.margin = unit(c(0,6,0,0),"mm"),
+			     panel.grid = element_blank())
+
+
+	})
+
 # Create output table
 colnames(cell_pop_perc2) <- c("sample", "population", "percentage")
 
 cell_pop2 <- reshape2::melt(cell_pop)
 cell_pop2$Var1 <- relevel(cell_pop2$Var1, ref = "CK5_organoid")
-cell_pop2$Var2 <- relevel(cell_pop2$Var2, ref="Unknown")
 
 colnames(cell_pop2) <- c("sample", "population", "num_cells")
 
@@ -142,7 +193,7 @@ cell_pop_tab <- cbind(cell_pop2, percentage=cell_pop_perc2$percentage)
 cell_pop_tab <- cell_pop_tab[cell_pop_tab$num_cells!=0, ]
 
 write.table(cell_pop_tab,
-            file="./output/tubuloid_cell_populations_desc.csv", sep=",",
+            file= paste0(OUTDIR,"/tubuloid_cell_populations_desc.csv"), sep=",",
             row.names = FALSE, col.names = TRUE, quote=TRUE)
 ```
 
@@ -151,16 +202,11 @@ write.table(cell_pop_tab,
 context_genes <- getGmt("../data/Prior/Kramann_context.gmt")
 ```
 
-```{r merged_split_context_dotplot_final, fig.width=21, fig.height=12, fig.path='./output/figs/', dev = c('png','pdf')}
+```{r merged_split_context_dotplot_final, fig.width=21, fig.height=12}
 plots <- DotPlot_panel(SeuratObject, assay = "RNA",
-                       unlist(geneIds(context_genes)), dot.scale = 12,
+                       unlist(geneIds(context_genes)), dot.scale = 10,
               scale.min = 0, scale.max = 100, col.min = -2.5, col.max = 2.5)
 
-# Reorder plots
-plots <- plots[c("CK5_organoid",
-                     "CK119_organoid",
-                     "CK120_CD13",
-                     "CK121_CD24")]
 # Common scale
 plots <- lapply(plots, function(gg) {
   gg + coord_flip() + scale_y_discrete(position = "right") +
@@ -174,48 +220,38 @@ plots <- lapply(plots, function(gg) {
 
 # Remove xlab
 plots <- lapply(plots, function(gg) gg + theme(axis.title.x = element_blank()))
-
-# Remove legend from the first three ones
-plots[1:3] <- lapply(plots[1:3], function(gg) gg + NoLegend())
-# Remove y axis title from the last three ones
-plots[-1] <- lapply(plots[-1], function(gg) gg + theme(axis.title.y = element_blank()))
-
-CombinePlots(plots,
-            rel_widths=c(8, 9, 6, 9),
-             ncol = 4)
+plots <- lapply(plots, function(gg) gg + theme(axis.title.y = element_blank()))
+plots <- lapply(plots, function(gg) gg + theme(legend.position = "bottom", legend.direction = "vertical"))
 ```
 
-### Heatmap of markers:
+## Panel of figures
 
-```{r merged_heatmap, fig.width=21, fig.height=12, dpi=600, fig.path='./output/figs/', dev = c('png','pdf')}
-heatmap_markers <- getGmt("../data/Prior/Xu_heatmap_markers.gmt")
+```{r umap_dplot_barplot, fig.width = 8.25, fig.height=10}
+for(tag in c("CK120", "CK121", "CK5" , "CK119", "JX1", "JX2", "JX3")) {
+	gg <- plot_grid(plot_grid(get(paste0(tag, "_umap")) + 
+					theme(plot.margin=unit(c(50, 4,10,4), "mm")), 
+				bp_res[[grep(tag, names(bp_res))]] + 
+					theme(plot.margin=unit(c(5, 10, 30, 20), "mm")), 
+				ncol=1, rel_heights = c(0.8,0.2)),
+			      plots[[grep(tag, names(plots))]] + theme(plot.margin=unit(c(4,15,4,4), "mm")), 
+			      ncol=2, rel_widths = c(0.5,0.5))
+	print(gg)
 
-SeuratObject <- SeuratObject[intersect(rownames(SeuratObject), unlist(geneIds(heatmap_markers))), ]
-SeuratObject <- ScaleData(SeuratObject, verbose = FALSE)
-
-CK5_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK5_organoid"),
-           res=NULL, cols=cols,
-           assay="RNA",
-           show_hr = FALSE,
-           GSC=heatmap_markers)
-
-CK119_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK119_organoid"),
-           res=NULL, cols=cols,
-           assay="RNA",
-           show_hr = FALSE,
-           GSC=heatmap_markers)
-
-CK121_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK121_CD24"),
-           res=NULL, cols=cols,
-           assay="RNA",
-            show_hr = FALSE,
-           GSC=heatmap_markers)
-
-CK120_hp <- DoHeatmap2(SeuratObject = subset(SeuratObject, orig.ident == "CK120_CD13"),
-           res=NULL, cols=cols,
-           assay="RNA",
-           show_hr = TRUE,
-           GSC=heatmap_markers)
-
-draw(CK5_hp + CK119_hp + CK121_hp + CK120_hp, heatmap_legend_side="bottom", annotation_legend_side = "bottom")
+}
 ```
+
+```{r 26_plots_aligned, fig.width=35, fig.height=22}
+ord <- sapply(names(plots), function(z) strsplit(z, split="_")[[1]][1])
+dplots <- plot_grid(plotlist=plots, ncol=length(plots), align="h", rel_widths=c(1.25,1.25, 1.5, 0.9, 1, 0.9, 1.1))
+
+umaps_list <- sapply(ord, function(tag) get(paste0(tag, "_umap")) + theme(plot.margin=unit(c(50, 4,10,4), "mm")), 
+		     simplify=FALSE)
+umaps <- plot_grid(plotlist=umaps_list, ncol=length(umaps_list), align="h")
+
+bp_list <- sapply(ord, function(tag) bp_res[[grep(tag, names(bp_res))]] + theme(plot.margin=unit(c(5, 10, 30, 20), "mm")), 
+		  simplify=FALSE)
+bps <- plot_grid(plotlist=bp_list, ncol=length(bp_list), align="h")
+
+plot_grid(dplots, umaps, bps, ncol=1, rel_heights = c(6, 5, 1))
+```
+

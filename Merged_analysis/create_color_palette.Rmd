@@ -24,7 +24,12 @@ Load and merge the individual samples from the project
 
 ```{r load_SeuratObjects}
 list_rds <- c("CK5_organoid"="../Individual_analysis_CK5_early_organoid/output/4_final_assignment/data/SeuratObject.rds",
-              "CK119_organoid"="../Individual_analysis_CK119_late_organoid/output/2_cell_assignment/data/SeuratObject.rds",
+              "CK119_organoid"="../Individual_analysis_CK119_late_organoid/output/4_final_assignment/data/SeuratObject.rds",
+	      "JX1_HC_organoid"="../Individual_analysis_JX1_HC_organoid/output/4_final_assignment/data/SeuratObject.rds",
+	      "ADPKD_PDK1KO " = paste0("../Individual_analysis_JX2_PKD1KO_organoid/",
+		     	"output/4_final_assignment/data/SeuratObject.rds"),
+	"ADPKD_PDK2KO" = paste0("..//Individual_analysis_JX3_PKD2KO_organoid/",
+		     	"output/4_final_assignment/data/SeuratObject.rds"),
               "CK120_CD13"="../Individual_analysis_CK120_CD13/output/4_final_assignment/data/SeuratObject.rds",
               "CK121_CD24"="../Individual_analysis_CK121_CD24/output/4_final_assignment/data/SeuratObject.rds")
 
@@ -95,10 +100,15 @@ split_classes <- split_classes[!grepl("unk", names(split_classes), ignore.case =
 #split_classes$`TPC` <- c(a1, a2)[order(c(seq_along(a1)*2 - 1, seq_along(a2)*2))]
 #split_classes$`PT-like` <- "DUMMY1"
 
-split_classes$`PT-like` <- "DUMMY"
 
 split_classes$`TPC` <- c(split_classes$`TPC`, split_classes$`Prolif.TPC`)
 split_classes$`PEC` <- c(split_classes$`PEC`, split_classes$`PEC-like`)
+split_classes$`DCT` <- c(split_classes$`DCT`, split_classes$`DCT-like`)
+split_classes$`PT` <- c(split_classes$`PT`, split_classes$`PT-like`)
+split_classes$`LOH, TAL cells` <- c(split_classes$`LOH, TAL cells`, split_classes$`TAL-like`)
+
+split_classes$`PT-like` <- "DUMMY"
+split_classes$`TAL-like` <- "DUMMY"
 
 
 # We keep the original number of classes to match across samples, creating a dummy class
@@ -107,7 +117,9 @@ prolif_idx <- grep("Prolif", names(split_classes))
 names(split_classes)[prolif_idx] <- paste0("DUMMY", prolif_idx)
 split_classes[grep("DUMMY", names(split_classes))] <- paste0("DUMMY",prolif_idx)
 
-split_classes$`PEC-like` <- "DUMMY"
+split_classes$`PEC-like` <- "DUMMY1" # Leave it but remove afterwards
+split_classes$`DCT-like` <- NULL # Rmove it
+
 # Generate the palette
 cols <- gg_color_hues(split_classes)
 cols <- c(cols,cols_unk)
@@ -121,6 +133,8 @@ cols <- c(cols,setNames(cols, paste0(names(cols),"_1")))
 # Remove the dummies
 cols <- cols[!grepl("DUMMY", names(cols))]
 cols <- cols[sort(names(cols))]
+# TAL-like gets purple, similar to TPC pink. So over-write
+
 # Save the palette
 saveRDS(cols, file="./output/color_scheme.rds")
 ```
