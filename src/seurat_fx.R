@@ -130,6 +130,7 @@ saveClusteringOutcome <- function(SeuratObject, assay="RNA", fl) {
 DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5, 
                        show_hr=TRUE, cols=NULL, width =NULL,name="Expr.",
                        row_names_fontisze=12,
+		       ttl=character(0),
                        legend.dir="vertical") {
   library(ComplexHeatmap)
   
@@ -224,6 +225,7 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
 		use_raster=FALSE,
                 top_annotation = hc, 
   		bottom_annotation = hc,
+		column_title=ttl,
                 split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(2, "mm"), 
                 column_split = factor(cl, levels=unique(cl)), column_title_rot=ifelse(cl_num,0,90), column_gap = unit(0, "mm"),
                 # left_annotation = rowAnnotation(foo=anno_block(gpar(fill=table(genes.cols)[unique(genes.cols)]),
