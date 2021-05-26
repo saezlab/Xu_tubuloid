@@ -169,3 +169,53 @@ draw(ht_list, ht_gap = unit(10, "mm"),
 ```
 
 ![](./03_PKDmarkers//figures/heatmap_PKDmarkers_tissue-1.png)<!-- -->
+
+## Pseudobulking
+
+We collapse single-cell information to express it as a pseudobulk
+profile for simplicity.
+
+``` r
+mat <- scater::sumCountsAcrossCells(as.matrix(S@assays$RNA@counts),
+                         ids = S$orig.ident
+                         )
+CPM <- edgeR::cpm(mat)[genes, ]
+
+# NOTE: this is same outcome as 
+#   genesorteR::sortGenes(S@assays$RNA@counts, S$orig.ident)$condGeneProb[genes,]
+PCT <- lapply(SplitObject(S, split.by="orig.ident"), function(Sj) { 
+        rowSums(Sj@assays$RNA@counts[genes, ] > 0)/ncol(Sj)
+                         })
+PCT <- t(do.call("rbind", PCT)) * 100
+
+# Same order
+ord <- c("ADPKD3_kidney", "CK224_kidney_PKD2-", "CK225_kidney_PKD1-",
+     "Control1_kidney", "Control2_kidney") # drop JX1, PKD-ctrl order
+CPM <- CPM[, ord]
+PCT <- PCT[, ord]
+```
+
+``` r
+hp1 <-Heatmap(t(scale(t(CPM))),
+          name="Gene Expr.\n(CPM, row scaled)",
+    column_title = "Pseudobulk",
+    cluster_rows = FALSE, cluster_columns = FALSE,
+    row_names_side = "left", column_names_side = "top",
+    row_names_gp = gpar(fontsize=12))
+
+col_fun <- circlize::colorRamp2(c(0,100), c("white", "green4"))
+hp2 <- Heatmap(PCT, col=col_fun,
+    column_title = "Positive expressing cells",
+     cluster_rows = FALSE, cluster_columns = FALSE,
+     row_names_side = "left", column_names_side="top", 
+     row_names_gp = gpar(fontsize = 10),
+     cell_fun = function(j, i, x, y, width, height, fill) {
+         grid.text(paste0(sprintf("%.2f", PCT[i, j])),
+               x, y, 
+              gp = gpar(fontsize = 12))
+             } ,
+             name="Perc.(%)")
+draw(hp1 + hp2, ht_gap = unit(10, "mm"))
+```
+
+![](./03_PKDmarkers//figures/heatmap_PKDmarkers_Tissue_bulk-1.png)<!-- -->
