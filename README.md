@@ -46,17 +46,6 @@ Samples were profiled by single-cell (organoid and sorted cells) or single-nucle
 Processed UMI gene expression values from the single-cell RNA-seq are deposited at https://doi.org/10.6084/m9.figshare.11786238 - and will be published (with DOI) upon manuscript acceptance.
 
 
-## Reproducibility
-Reproducible results are available following these steps:
-
-1. [Optionally] Request access to the raw sequencing 10x data (FastQ files) to Rafael Kramann following the manuscript details. Then preprocess the data following your preferences.
-2. Download the data matrices from CellRanger. The processed data with gene expression values are available at https://doi.org/10.6084/m9.figshare.11786238. These data must be located in `./data/sc/`.
-3. Run the make script to re-build the html rmarkdowns reports
-
-```bash
-bash make.sh
-```
-
 ## Environment
 
 **Main required packages**
