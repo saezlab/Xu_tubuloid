@@ -1,0 +1,148 @@
+---
+title: "Cluster annotation in integrated Harmony space "
+author: "Javier Perales-Paton - javier.perales@bioquant.uni-heidelberg.de"
+license: "GPL-v3"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+Sys.setenv(RSTUDIO_PANDOC="/usr/lib/rstudio/bin/pandoc")
+knitr::opts_chunk$set(echo = TRUE)
+
+# Output directory
+OUTDIR <- "./04_clusters/"
+if(!dir.exists(OUTDIR)) dir.create(OUTDIR);
+# Figures
+FIGDIR <- paste0(OUTDIR, "/figures/")
+knitr::opts_chunk$set(fig.path=FIGDIR)
+knitr::opts_chunk$set(dev=c('png', 'pdf'))
+knitr::opts_chunk$set(dpi=300)
+# Data
+DATADIR <- paste0(OUTDIR, "/data/")
+if(!dir.exists(DATADIR)) dir.create(DATADIR);
+```
+
+## Load libraries and auxiliar functions
+```{r libs}
+set.seed(1234)
+suppressPackageStartupMessages(require(Seurat))
+suppressPackageStartupMessages(require(harmony))
+suppressPackageStartupMessages(require(cowplot))
+suppressPackageStartupMessages(require(ggplot2))
+suppressPackageStartupMessages(require(genesorteR))
+suppressPackageStartupMessages(require(openxlsx))
+library(cowplot)
+source("../src/seurat_fx.R")
+```
+
+
+## Load data
+```{r save}
+S <- readRDS(file=paste0("./01_harmony_integration/data","/S.rds"))
+Project(S) <- "Integrated_tissue"
+```
+
+### 1 wilcox test
+
+```{r wilcox, cache=FALSE}
+up <- setNames(vector("list",length=length(levels(S))), 
+                levels(S))
+for(idx in names(up)) {
+   up.idx <- FindMarkers(S,ident.1 = idx, 
+                         ident.2 = setdiff(levels(S), idx), 
+ 			grouping.var = "orig.ident",
+ 			only.pos=T)
+   cols_names <- colnames(up.idx)
+   
+   # Add two extra cols
+   up.idx$cluster <- idx
+   up.idx$gene <- rownames(up.idx)
+   
+   up[[idx]] <- up.idx
+}
+```
+
+### 2 Gene sorter
+
+```{r genesort, cache=FALSE}
+sg <- sortGenes(S@assays$RNA@data, Idents(S))
+```
+
+## Annotation
+```{r}
+ren_id <- c("0"="PC-CD/CNT",
+	    "1"="PT_1",
+	    "2"="TAL_1",
+	    "3"="TAL_2",
+	    "4"="DCT_1",
+	    "5"="EC",
+	    "6"="PT_3/PEC",
+	    "7"="PT_4",
+	    "8"="PT_2",
+	    "9"="vSMC/Fib",
+	    "10"="T-Cell",
+	    "11"="IC-A",
+	    "12"="Pod", # Podocytes
+	    "13"="B-Cell",
+	    "14"="Mac",
+	    "15"="IC-B",
+	    "16"="DCT_2",
+	    "17"="Mast-Cell",
+	    "18"="Unk_1",
+	    "19"="Unk_2")
+# ren_id <- factor(ren_id, levels=ren_id)
+S$idx <- Idents(S)
+S$ann <- ren_id[Idents(S)]
+```
+
+```{r cell_ann}
+stopifnot(all(names(ren_id) %in% levels(S)))
+stopifnot(length(ren_id) == length(levels(S)))
+
+S <- RenameIdents(S, ren_id)
+S$init_assign <- factor(as.character(Idents(S)))
+
+colnames(sg$condGeneProb) <- ren_id[colnames(sg$condGeneProb)]
+colnames(sg$specScore) <- ren_id[colnames(sg$specScore)]
+```
+
+
+Finally we save the markers for manual exploration:
+```{r init_markers_save, warning=FALSE}
+saveMarkers.Excel(up, sg, S, OUTDIR)
+# saveMarkers.CSV(sg, OUTDIR)
+```
+
+
+## Visualization
+
+```{r umap_cond}
+S$cond <- ifelse(grepl("Control", S$orig.ident), "Control", "ADPKD")
+p1 <- DimPlot(S, group.by="cond") + theme(legend.position="bottom")
+```
+
+```{r umap_patient}
+p4 <- DimPlot(S, group.by="orig.ident") + 
+	guides(fill=guide_legend(nrow=3,byrow=TRUE, size=3),
+	       colour=guide_legend(nrow=3, override.aes = list(size=3))) + 
+	       theme(legend.position="bottom")
+print(p4)
+```
+
+
+```{r umap_ident}
+p2 <- DimPlot(S, group.by="idx", label=TRUE) + theme(legend.position="bottom")
+p3 <- DimPlot(S, group.by="ann", label=TRUE) + theme(legend.position="bottom")
+```
+
+```{r umap_tissue, fig.width=14, fig.height=7}
+plot_grid(p2,p1, align="h")
+plot_grid(p3,p1, align="h")
+```
+
+```{r umap_tissueByPatient, fig.width=14, fig.height=7}
+plot_grid(p2,p4, align="h")
+plot_grid(p3,p4, align="h")
+```
+
+
