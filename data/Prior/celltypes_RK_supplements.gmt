@@ -1,0 +1,20 @@
+PEC	> Parietal epithelial cell	CRB2	CLDN1	VCAM1	CDH6	AKAP12	
+PT	> Proximal Tubule Cell (general)	CUBN	LRP2	SLC13A1	ALDOB	GATM	SLC34A1
+PT-S1	> Proximal Convoluted Tubule Cell Segment 1	SLC5A2	SLC5A12
+PT-S2	> Proximal Tubule Cell Segment 2	SLC22A6
+PT-S3	> Proximal Tubule Cell Segment 3	PDZK1IP1	MT1G
+DTL	> Descending Thin Limb Cell (general)	CRYAB	VCAM1	AQP1	SPP1
+ATL	> Ascending Thin Limb Cell (general)	CRYAB	TACSTD2	CLDN3
+TAL	> Thick Ascending Limb Cell (general)	SLC12A1	UMOD
+DCT	> Distal Convoluted Tubule Cell (general)	SLC12A3	TRPM6	HSD11B2
+CNT	> Connecting Tubule Cell (general)	SLC8A1	CALB1	TRPV5
+CNT-PC	> CNT-Principal Cell	SLC8A1	AQP2	SCNN1G
+CNT-IC	> CNT-Intercalated Cell	SLC8A1	CA2	ATP6VOD2
+CNT-IC-A	> CNT-IC-A	SLC8A1	SLC4A1	SLC26A7
+CNT-IC-B	> CNT-IC-B	SLC8A1	SLC26A4	SLC4A9
+CD	> Collecting duct (general)	GATA3
+CD-PC	> CD-PC (general)	AQP2	AQP3	FXYD4	SCNN1G	GATA3
+CD-IC-A	> CD-IC-A (general)	SLC4A1	SLC26A7	TMEM213
+CD-IC-B	> CD-IC-B (general)	SLC4A9	SLC26A4
+proliferation		MKI67	BIRC5	CDKN3
+general markers		PECAM1	PTPRC	EPCAM	ANPEP	CD24	PROM1	SOX9
