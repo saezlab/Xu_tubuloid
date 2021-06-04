@@ -119,7 +119,22 @@ Control1_hp <- DoHeatmap2(SeuratObject = subset(S, orig.ident=="Control1_kidney"
            assay="RNA", name="",
            show_hr = FALSE,
            GSC=GSC)
+```
 
+    ## Loading required package: grid
+
+    ## ========================================
+    ## ComplexHeatmap version 2.0.0
+    ## Bioconductor page: http://bioconductor.org/packages/ComplexHeatmap/
+    ## Github page: https://github.com/jokergoo/ComplexHeatmap
+    ## Documentation: http://jokergoo.github.io/ComplexHeatmap-reference
+    ## 
+    ## If you use it in published research, please cite:
+    ## Gu, Z. Complex heatmaps reveal patterns and correlations in multidimensional 
+    ##   genomic data. Bioinformatics 2016.
+    ## ========================================
+
+``` r
 Control2_hp <- DoHeatmap2(SeuratObject = subset(S, orig.ident=="Control1_kidney"),
         row_names_fontisze=12,
            res=NULL,# cols=cols,
@@ -203,7 +218,7 @@ hp1 <-Heatmap(t(scale(t(CPM))),
     row_names_side = "left", column_names_side = "top",
     row_names_gp = gpar(fontsize=12))
 
-col_fun <- circlize::colorRamp2(c(0,100), c("white", "green4"))
+col_fun <- circlize::colorRamp2(c(0, 50, 100), c("blue", "#EEEEEE", "red"))
 hp2 <- Heatmap(PCT, col=col_fun,
     column_title = "Positive expressing cells",
      cluster_rows = FALSE, cluster_columns = FALSE,

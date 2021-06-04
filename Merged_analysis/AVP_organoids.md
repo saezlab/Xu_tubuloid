@@ -71,7 +71,7 @@ for(sname in names(list_rds)) {
 ## individual UMAPs per sample
 
 ``` r
-cols <- readRDS(file="./output2/color_scheme.rds")
+cols <- readRDS(file="./output/color_scheme.rds")
 ```
 
 # Merge samples

@@ -82,14 +82,14 @@ The final table of markers on the second round of cell clustering give the follo
 ren_id <- c("0"="DCT-like_1",
             "1"="TPC_1",
             "2"="TPC_2",
-            "3"="DCT-like_2",
+            "3"="TPC_3",
             "4"="Prolif.TPC_1",
-            "5"="DCT-like_3",
+            "5"="TPC_4",
             "6"="Prolif.TPC_2",
-            "7"="TPC_3",
-            "8"="TPC_4",
-            "9"="TAL-like",
-            "10"="PT-like"
+            "7"="TPC_5",
+            "8"="TPC_6",
+            "9"="TPC_7",
+            "10"="PEC"
             )
 ```
 

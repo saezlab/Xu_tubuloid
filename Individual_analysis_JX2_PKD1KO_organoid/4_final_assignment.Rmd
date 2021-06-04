@@ -79,10 +79,10 @@ saveMarkers.CSV(sg, OUTDIR)
 The final table of markers on the second round of cell clustering give the following results:
 
 ```{r rename_idents}
-ren_id <- c("0"="DCT-like_1",
-            "1"="TPC",
-            "2"="DCT-like_2",
-            "3"="DCT-like_3")
+ren_id <- c("0"="TPC_1",
+            "1"="TPC_2",
+            "2"="TPC_3",
+            "3"="TPC_4")
 ```
 
 

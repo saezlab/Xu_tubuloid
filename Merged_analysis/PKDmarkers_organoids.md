@@ -17,6 +17,10 @@ source("../src/seurat_fx.R")
 ## Load SeuratObject with initial clustering outcome
 
 ``` r
+CK120_CD13 <- readRDS("../Individual_analysis_CK120_CD13/output/4_final_assignment/data/SeuratObject.rds")
+
+CK121_CD24 <- readRDS("../Individual_analysis_CK121_CD24/output/4_final_assignment/data/SeuratObject.rds")
+
 early <- readRDS(paste0("../Individual_analysis_CK5_early_organoid/",
             "output/4_final_assignment/data/SeuratObject.rds")
 )
@@ -32,80 +36,36 @@ HC <- readRDS(paste0("../Individual_analysis_JX1_HC_organoid/",
 )
 HC$final_Ident <- Idents(HC)
 
-ADPKD_PDK1KO <- readRDS(paste0("../Individual_analysis_JX2_PKD1KO_organoid/",
+ADPKD_PKD1KO <- readRDS(paste0("../Individual_analysis_JX2_PKD1KO_organoid/",
                 "output/4_final_assignment/data/SeuratObject.rds"))
-ADPKD_PDK1KO$final_Ident <- Idents(ADPKD_PDK1KO)
+ADPKD_PKD1KO$final_Ident <- Idents(ADPKD_PKD1KO)
 
-ADPKD_PDK2KO <- readRDS(paste0("..//Individual_analysis_JX3_PKD2KO_organoid/",
+ADPKD_PKD2KO <- readRDS(paste0("..//Individual_analysis_JX3_PKD2KO_organoid/",
                 "output/4_final_assignment/data/SeuratObject.rds"))
-ADPKD_PDK2KO$final_Ident <- Idents(ADPKD_PDK2KO)
+ADPKD_PKD2KO$final_Ident <- Idents(ADPKD_PKD2KO)
 ```
 
-## Selection of PKD markers
+## Merge
 
 ``` r
-S <- merge(early, list(late, HC, ADPKD_PDK1KO, ADPKD_PDK2KO))
+SL <- list(CK120_CD13, CK121_CD24, early, late, HC, ADPKD_PKD1KO, ADPKD_PKD2KO)
+rm(CK120_CD13, CK121_CD24, early, late, HC, ADPKD_PKD1KO, ADPKD_PKD2KO)
+S <- merge(SL[[1]], SL[-1])
 ```
 
     ## Warning in CheckDuplicateCellNames(object.list = objects): Some cell names
     ## are duplicated across objects provided. Renaming to enforce unique cell
     ## names.
 
-``` r
-# Curated list of PKD markers from literature
-genes <- c("STAT3", "TGFB1", "MET", "LGALS3", "NDRG1")
-
-plots <- DotPlot_panel(S, assay = "RNA",
-                       intersect(genes, rownames(S)), 
-               dot.scale = 12,
-              scale.min = 0, scale.max = 100, col.min = -2.5, col.max = 2.5)
-
-# Common scale
-plots <- lapply(plots, function(gg) {
-  gg + coord_flip() + scale_y_discrete(position = "right") +
-    
-  # This is extremely important to use same scaling color for all samples
-  scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
-      
-  theme(axis.text.x = element_text(angle = 45, hjust = 0),
-        plot.title = element_text(size=18, hjust = 0.5))
-  })
-```
-
-    ## Scale for 'colour' is already present. Adding another scale for
-    ## 'colour', which will replace the existing scale.
-    ## Scale for 'colour' is already present. Adding another scale for
-    ## 'colour', which will replace the existing scale.
-    ## Scale for 'colour' is already present. Adding another scale for
-    ## 'colour', which will replace the existing scale.
-    ## Scale for 'colour' is already present. Adding another scale for
-    ## 'colour', which will replace the existing scale.
-    ## Scale for 'colour' is already present. Adding another scale for
-    ## 'colour', which will replace the existing scale.
-
-``` r
-# Remove xlab
-plots <- lapply(plots, function(gg) gg + theme(axis.title.x = element_blank()))
-
-# Remove legend from the first three ones
-plots[1:4] <- lapply(plots[1:4], function(gg) gg + NoLegend())
-# Remove y axis title from the last three ones
-plots[-1] <- lapply(plots[-1], function(gg) gg + theme(axis.title.y = element_blank()))
-
-CombinePlots(plots,
-            rel_widths=c(6, 6, 7, 4, 9),
-             ncol = 5)
-```
-
-    ## Warning: Graphs cannot be vertically aligned unless the axis parameter is
-    ## set. Placing graphs unaligned.
-
-![](./PKDmarkers_organoids//figures/dotplot_PKDmarkers_organoids-1.png)<!-- -->
-
 ## Heatmap
 
 ``` r
 cols <- readRDS(file="./output/color_scheme.rds")
+```
+
+``` r
+# Curated list of PKD markers from literature
+genes <- c("STAT3", "TGFB1", "MET", "LGALS3", "NDRG1")
 ```
 
 ``` r
@@ -193,7 +153,7 @@ hp1 <-Heatmap(t(scale(t(CPM))),
     row_names_side = "left", column_names_side = "top",
     row_names_gp = gpar(fontsize=12))
 
-col_fun <- circlize::colorRamp2(c(0,100), c("white", "green4"))
+col_fun <- circlize::colorRamp2(c(0, 50, 100), c("blue", "#EEEEEE", "red"))
 hp2 <- Heatmap(PCT, col=col_fun,
     column_title = "Positive expressing cells",
      cluster_rows = FALSE, cluster_columns = FALSE,

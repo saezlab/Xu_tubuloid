@@ -110,23 +110,12 @@ saveMarkers.CSV(sg, OUTDIR)
 
 ## Final cell assignment
 
-The final table of markers on the second round of cell clustering give
-the following results:
-
-| Cluster   | rational  |
-| :-------- | :-------- |
-| Cluster 0 | PT\_S2\_1 |
-| Cluster 1 | PT\_S2\_2 |
-| Cluster 2 | PT\_S2\_3 |
-| Cluster 3 | PT\_S1\_1 |
-| Cluster 4 | PT\_S3    |
-
 ``` r
-ren_id <- c("0"="PT_S2_1",
-            "1"="PT_S2_2",
-            "2"="PT_S2_3",
-            "3"="PT_S1_1",
-            "4"="PT_S3")
+ren_id <- c("0"="PT_1",
+            "1"="PT_2",
+            "2"="PT_3",
+            "3"="PT_S3/TL",
+            "4"="PT_4")
 SeuratObject <- RenameIdents(SeuratObject, ren_id)
 ```
 

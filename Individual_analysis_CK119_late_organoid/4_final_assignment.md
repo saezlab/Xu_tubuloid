@@ -90,10 +90,10 @@ the following results:
 ren_id <- c("0"="TPC_1",
             "1"="Prolif.TPC_1",
             "2"="TPC_2",
-            "3"="TPC_4",
-            "4"="TPC_3",
+            "3"="TPC_3",
+            "4"="TPC_4",
             "5"="Prolif.TPC_2",
-            "6"="Epith.Unknown",
+            "6"="TPC_5",
             "7"="PEC-like"
             )
 ```
@@ -142,23 +142,6 @@ DoClustReport(SeuratObject, sg, AdultOrganoid, show_NCells=TRUE)
     ## Scale for 'size' is already present. Adding another scale for 'size',
     ## which will replace the existing scale.
 
-    ## Loading required package: gridExtra
-
-    ## 
-    ## Attaching package: 'gridExtra'
-
-    ## The following object is masked from 'package:dplyr':
-    ## 
-    ##     combine
-
-    ## The following object is masked from 'package:Biobase':
-    ## 
-    ##     combine
-
-    ## The following object is masked from 'package:BiocGenerics':
-    ## 
-    ##     combine
-
 ![](4_final_assignment_files/figure-gfm/ClustReport-1.png)<!-- -->
 
 ## UMAP plot
@@ -167,10 +150,6 @@ DoClustReport(SeuratObject, sg, AdultOrganoid, show_NCells=TRUE)
 DimPlot(SeuratObject, reduction = "umap", label=TRUE) +
     coord_cartesian(clip = "off")
 ```
-
-    ## Warning: Using `as.character()` on a quosure is deprecated as of rlang 0.3.0.
-    ## Please use `as_label()` or `as_name()` instead.
-    ## This warning is displayed once per session.
 
 ![](4_final_assignment_files/figure-gfm/unnamed-chunk-1-1.png)<!-- -->
 
@@ -231,7 +210,7 @@ sessionInfo()
     ## [10] GSEABase_1.46.0      graph_1.62.0         annotate_1.62.0     
     ## [13] XML_3.98-1.20        AnnotationDbi_1.46.1 IRanges_2.18.2      
     ## [16] S4Vectors_0.22.1     Biobase_2.44.0       BiocGenerics_0.30.0 
-    ## [19] ggplot2_3.2.1        Seurat_3.1.0         rmarkdown_1.15      
+    ## [19] ggplot2_3.3.3        Seurat_3.1.0         rmarkdown_1.15      
     ## [22] nvimcom_0.9-82      
     ## 
     ## loaded via a namespace (and not attached):
