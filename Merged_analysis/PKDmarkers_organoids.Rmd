@@ -71,7 +71,7 @@ rm(CK120_CD13, CK121_CD24, early, late, HC, ADPKD_PKD1KO, ADPKD_PKD2KO)
 S <- merge(SL[[1]], SL[-1])
 ```
 
-## Heatmap
+
 
 ```{r load_colors}
 cols <- readRDS(file="./output/color_scheme.rds")
@@ -82,6 +82,40 @@ cols <- readRDS(file="./output/color_scheme.rds")
 genes <- c("STAT3", "TGFB1", "MET", "LGALS3", "NDRG1")
 ```
 
+## DotPlot
+```{r dotplot_PKDmarkers_organoids, fig.width=21, fig.height=5, dpi=300}
+plots <- DotPlot_panel(subset(S, orig.ident %in% c("CK5_organoid", "CK119_organoid", 
+						   "JX2_PKD1KO_organoid", "JX3_PKD2KO_organoid")), 
+			      assay = "RNA",
+                       intersect(genes, rownames(S)), 
+		       dot.scale = 12,
+              scale.min = 0, scale.max = 100, col.min = -2.5, col.max = 2.5)
+
+# Common scale
+plots <- lapply(plots, function(gg) {
+  gg + coord_flip() + scale_y_discrete(position = "right") +
+    
+  # This is extremely important to use same scaling color for all samples
+  scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
+      
+  theme(axis.text.x = element_text(angle = 45, hjust = 0),
+        plot.title = element_text(size=18, hjust = 0.5))
+  })
+# Remove xlab
+plots <- lapply(plots, function(gg) gg + theme(axis.title.x = element_blank()))
+
+# Remove legend from the first three ones
+plots[1:4] <- lapply(plots[1:4], function(gg) gg + NoLegend())
+# Remove y axis title from the last three ones
+plots[-1] <- lapply(plots[-1], function(gg) gg + theme(axis.title.y = element_blank()))
+
+CombinePlots(plots,
+            rel_widths=c(6, 6, 4, 6),
+             ncol = 5)
+```
+
+
+## Heatmap
 
 ```{r heatmap_PKDmarkers_organoids, fig.width=9.4, fig.height=4, dpi=600}
 Sx<- S[intersect(rownames(S), genes), ]

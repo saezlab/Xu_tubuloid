@@ -57,8 +57,6 @@ S <- merge(SL[[1]], SL[-1])
     ## are duplicated across objects provided. Renaming to enforce unique cell
     ## names.
 
-## Heatmap
-
 ``` r
 cols <- readRDS(file="./output/color_scheme.rds")
 ```
@@ -67,6 +65,55 @@ cols <- readRDS(file="./output/color_scheme.rds")
 # Curated list of PKD markers from literature
 genes <- c("STAT3", "TGFB1", "MET", "LGALS3", "NDRG1")
 ```
+
+## DotPlot
+
+``` r
+plots <- DotPlot_panel(subset(S, orig.ident %in% c("CK5_organoid", "CK119_organoid", 
+                           "JX2_PKD1KO_organoid", "JX3_PKD2KO_organoid")), 
+                  assay = "RNA",
+                       intersect(genes, rownames(S)), 
+               dot.scale = 12,
+              scale.min = 0, scale.max = 100, col.min = -2.5, col.max = 2.5)
+
+# Common scale
+plots <- lapply(plots, function(gg) {
+  gg + coord_flip() + scale_y_discrete(position = "right") +
+    
+  # This is extremely important to use same scaling color for all samples
+  scale_color_gradient(low="lightgrey", high = "blue",limits=c(-1.5, 2.5)) +
+      
+  theme(axis.text.x = element_text(angle = 45, hjust = 0),
+        plot.title = element_text(size=18, hjust = 0.5))
+  })
+```
+
+    ## Scale for 'colour' is already present. Adding another scale for
+    ## 'colour', which will replace the existing scale.
+    ## Scale for 'colour' is already present. Adding another scale for
+    ## 'colour', which will replace the existing scale.
+    ## Scale for 'colour' is already present. Adding another scale for
+    ## 'colour', which will replace the existing scale.
+    ## Scale for 'colour' is already present. Adding another scale for
+    ## 'colour', which will replace the existing scale.
+
+``` r
+# Remove xlab
+plots <- lapply(plots, function(gg) gg + theme(axis.title.x = element_blank()))
+
+# Remove legend from the first three ones
+plots[1:4] <- lapply(plots[1:4], function(gg) gg + NoLegend())
+# Remove y axis title from the last three ones
+plots[-1] <- lapply(plots[-1], function(gg) gg + theme(axis.title.y = element_blank()))
+
+CombinePlots(plots,
+            rel_widths=c(6, 6, 4, 6),
+             ncol = 5)
+```
+
+![](./PKDmarkers_organoids//figures/dotplot_PKDmarkers_organoids-1.png)<!-- -->
+
+## Heatmap
 
 ``` r
 Sx<- S[intersect(rownames(S), genes), ]
