@@ -131,6 +131,8 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
                        show_hr=TRUE, cols=NULL, width =NULL,name="Expr.",
                        row_names_fontisze=12,
 		       ttl=character(0),
+		       row_gap_mm = 2,
+		       border_boolean = TRUE,
                        legend.dir="vertical") {
   library(ComplexHeatmap)
   
@@ -226,13 +228,13 @@ DoHeatmap2 <- function(SeuratObject, GSC, assay="RNA", res=0.5,
                 top_annotation = hc, 
   		bottom_annotation = hc,
 		column_title=ttl,
-                split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(2, "mm"), 
+                split=factor(genes.cols, levels=unique(genes.cols)),row_title_rot = 0,row_gap = unit(row_gap_mm, "mm"), 
                 column_split = factor(cl, levels=unique(cl)), column_title_rot=ifelse(cl_num,0,90), column_gap = unit(0, "mm"),
                 # left_annotation = rowAnnotation(foo=anno_block(gpar(fill=table(genes.cols)[unique(genes.cols)]),
                 #                                                labels=unique(genes.cols),
                 #                                                labels_gp=gpar(col="white",fontsize=10))),
                 width=width,
-		border=TRUE,
+		border=border_boolean,
                 heatmap_legend_param= list(legend_height = unit(4, "cm"),
                                            title_gp=gpar(fontsize=16),
                                            direction=legend.dir,
@@ -400,7 +402,7 @@ DotPlot2 <- function(SeuratObject, GSC, assay="RNA", res=NULL) {
 	Idents(SeuratObject) <- factor(Idents(SeuratObject), levels=levels(SeuratObject)[ord])
 
 	yfeatures <- data.frame("gene"=unlist(gene_list),
-				"geneset"=unlist(sapply(names(gene_list), function(z) rep(z, length(gene_list[[z]]))))
+				"geneset"=unlist(sapply(names(gene_list), function(z) rep(z, length(gene_list[[z]])), simplify=FALSE))
 				)
 	yfeatures$geneset <- factor(yfeatures$geneset, levels=rev(names(GSC)))
 	yfeatures <- yfeatures[order(yfeatures$geneset),]
